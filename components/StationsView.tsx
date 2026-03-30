@@ -182,7 +182,10 @@ const StationsView: React.FC<StationsViewProps> = ({
                                     {isAdmin && (
                                         <>
                                             <span className="text-gray-200 dark:text-slate-700">·</span>
-                                            <button className="flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline">
+                                            <button
+                                                onClick={() => onSaveStation({ ...station, id: station.id })}
+                                                className="flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                                            >
                                                 <Edit2 className="w-3 h-3" />
                                                 Editar
                                             </button>
@@ -197,7 +200,10 @@ const StationsView: React.FC<StationsViewProps> = ({
                                         </>
                                     )}
                                     <div className="flex-1" />
-                                    <button className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-400 transition-colors">
+                                    <button
+                                        onClick={() => onViewOnMap(station)}
+                                        className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-400 transition-colors"
+                                    >
                                         <ChevronRight className="w-4 h-4" />
                                     </button>
                                 </div>
