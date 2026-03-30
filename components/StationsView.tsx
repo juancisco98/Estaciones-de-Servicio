@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Plus, Search, MapPin, Gauge, Users, AlertTriangle, Power, Edit2, ChevronRight } from 'lucide-react';
 import { Station, Employee, Alert, User } from '../types';
 import { useAlerts } from '../hooks/useAlerts';
+import StationFormModal from './StationFormModal';
 
 interface StationsViewProps {
     stations: Station[];
@@ -28,6 +29,9 @@ const StationsView: React.FC<StationsViewProps> = ({
 }) => {
     const [search, setSearch]       = useState('');
     const [showInactive, setShowInactive] = useState(false);
+    const [showModal, setShowModal] = useState(false);
+    const [editingStation, setEditingStation] = useState<Station | null>(null);
+    const [confirmDeactivateId, setConfirmDeactivateId] = useState<string | null>(null);
     const { getStationAlertMap }    = useAlerts();
     const alertMap                  = getStationAlertMap();
 
@@ -66,19 +70,19 @@ const StationsView: React.FC<StationsViewProps> = ({
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
             {/* Header */}
-            <div className="shrink-0 p-4 pb-3 bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-white/10">
+            <div className="shrink-0 p-5 pb-4 bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-white/10">
                 <div className="flex items-center justify-between gap-3 mb-4">
-                    <div className="flex items-center gap-2">
-                        <Gauge className="w-5 h-5 text-amber-500" />
-                        <h1 className="text-xl font-black text-gray-900 dark:text-white">Estaciones</h1>
-                        <span className="text-xs font-bold text-gray-400 dark:text-slate-500 bg-gray-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                    <div className="flex items-center gap-3">
+                        <Gauge className="w-6 h-6 text-amber-500" />
+                        <h1 className="text-2xl font-black text-gray-900 dark:text-white">Estaciones</h1>
+                        <span className="text-xs font-bold text-gray-400 dark:text-slate-500 bg-gray-100 dark:bg-slate-800 px-2.5 py-1 rounded-full">
                             {stations.filter(s => s.isActive).length} activas
                         </span>
                     </div>
                     {isAdmin && (
                         <button
-                            onClick={() => onSaveStation({ name: '', address: '', coordinates: [-34.6037, -58.3816], isActive: true })}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-white text-sm font-bold transition-all active:scale-95"
+                            onClick={() => { setEditingStation(null); setShowModal(true); }}
+                            className="flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl text-white text-sm font-bold transition-all active:scale-95"
                             style={{
                                 background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                                 boxShadow: '0 4px 12px rgba(245,158,11,0.35), 0 2px 4px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.20)',
@@ -90,23 +94,23 @@ const StationsView: React.FC<StationsViewProps> = ({
                     )}
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                     <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                         <input
                             type="text"
                             value={search}
                             onChange={e => setSearch(e.target.value)}
                             placeholder="Buscar por nombre, código o ciudad..."
-                            className="w-full pl-8 pr-3 py-2 text-sm rounded-xl bg-gray-100 dark:bg-slate-800 border border-transparent focus:border-amber-400 focus:outline-none text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-slate-500"
+                            className="w-full pl-10 pr-4 py-2.5 min-h-[44px] text-sm rounded-xl bg-gray-100 dark:bg-slate-800 border border-transparent focus:border-amber-400 focus:outline-none text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-slate-500"
                         />
                     </div>
-                    <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-slate-400 cursor-pointer select-none whitespace-nowrap">
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-slate-400 cursor-pointer select-none whitespace-nowrap">
                         <input
                             type="checkbox"
                             checked={showInactive}
                             onChange={e => setShowInactive(e.target.checked)}
-                            className="rounded accent-amber-500"
+                            className="w-4 h-4 rounded accent-amber-500"
                         />
                         Ver inactivas
                     </label>
@@ -115,7 +119,7 @@ const StationsView: React.FC<StationsViewProps> = ({
 
             {/* Station grid */}
             <div className="flex-1 overflow-y-auto p-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                     {filtered.map(station => {
                         const alertLevel    = alertMap.get(station.id);
                         const empCount      = employeeCountByStation.get(station.id) ?? 0;
@@ -127,7 +131,7 @@ const StationsView: React.FC<StationsViewProps> = ({
                         return (
                             <div
                                 key={station.id}
-                                className={`bg-white dark:bg-slate-900 rounded-2xl border ${borderColor} p-4 flex flex-col gap-3 transition-all duration-200 hover:-translate-y-0.5 cursor-default`}
+                                className={`bg-white dark:bg-slate-900 rounded-2xl border ${borderColor} p-5 flex flex-col gap-3.5 transition-all duration-200 hover:-translate-y-0.5 cursor-default`}
                                 style={{
                                     boxShadow: '0 0 0 1px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.80)',
                                 }}
@@ -159,9 +163,9 @@ const StationsView: React.FC<StationsViewProps> = ({
                                     <span className="truncate">{station.address}{station.city ? `, ${station.city}` : ''}</span>
                                 </div>
 
-                                <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-slate-400">
-                                    <div className="flex items-center gap-1">
-                                        <Users className="w-3 h-3" />
+                                <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-slate-400">
+                                    <div className="flex items-center gap-1.5">
+                                        <Users className="w-3.5 h-3.5" />
                                         <span>{empCount} empleados</span>
                                     </div>
                                     {station.phone && (
@@ -171,10 +175,10 @@ const StationsView: React.FC<StationsViewProps> = ({
                                 </div>
 
                                 {/* Actions */}
-                                <div className="flex items-center gap-2 pt-1 border-t border-gray-50 dark:border-white/5">
+                                <div className="flex items-center gap-2.5 pt-2 border-t border-gray-50 dark:border-white/5">
                                     <button
                                         onClick={() => onViewOnMap(station)}
-                                        className="flex items-center gap-1 text-xs font-semibold text-amber-600 dark:text-amber-400 hover:underline"
+                                        className="flex items-center gap-1.5 text-sm font-semibold text-amber-600 dark:text-amber-400 hover:underline min-h-[36px]"
                                     >
                                         <MapPin className="w-3 h-3" />
                                         Ver mapa
@@ -183,20 +187,37 @@ const StationsView: React.FC<StationsViewProps> = ({
                                         <>
                                             <span className="text-gray-200 dark:text-slate-700">·</span>
                                             <button
-                                                onClick={() => onSaveStation({ ...station, id: station.id })}
-                                                className="flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                                                onClick={() => { setEditingStation(station); setShowModal(true); }}
+                                                className="flex items-center gap-1.5 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline min-h-[36px]"
                                             >
                                                 <Edit2 className="w-3 h-3" />
                                                 Editar
                                             </button>
                                             <span className="text-gray-200 dark:text-slate-700">·</span>
-                                            <button
-                                                onClick={() => onDeactivateStation(station.id)}
-                                                className="flex items-center gap-1 text-xs font-semibold text-red-500 dark:text-rose-400 hover:underline"
-                                            >
-                                                <Power className="w-3 h-3" />
-                                                {station.isActive ? 'Desactivar' : 'Activar'}
-                                            </button>
+                                            {confirmDeactivateId === station.id ? (
+                                                <div className="flex items-center gap-1">
+                                                    <button
+                                                        onClick={() => { onDeactivateStation(station.id); setConfirmDeactivateId(null); }}
+                                                        className="text-[10px] font-bold text-white bg-red-500 hover:bg-red-600 px-2 py-0.5 rounded-lg transition-colors"
+                                                    >
+                                                        {station.isActive ? 'Confirmar' : 'Activar'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setConfirmDeactivateId(null)}
+                                                        className="text-[10px] font-bold text-gray-400 hover:text-gray-600 px-1"
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    onClick={() => setConfirmDeactivateId(station.id)}
+                                                    className="flex items-center gap-1.5 text-sm font-semibold text-red-500 dark:text-rose-400 hover:underline min-h-[36px]"
+                                                >
+                                                    <Power className="w-3 h-3" />
+                                                    {station.isActive ? 'Desactivar' : 'Activar'}
+                                                </button>
+                                            )}
                                         </>
                                     )}
                                     <div className="flex-1" />
@@ -213,11 +234,20 @@ const StationsView: React.FC<StationsViewProps> = ({
                 </div>
                 {filtered.length === 0 && (
                     <div className="py-20 text-center">
-                        <Gauge className="w-12 h-12 mx-auto text-gray-300 dark:text-slate-700 mb-3" />
+                        <Gauge className="w-16 h-16 mx-auto text-gray-300 dark:text-slate-700 mb-4" />
                         <p className="text-gray-400 dark:text-slate-500 font-medium">No se encontraron estaciones</p>
                     </div>
                 )}
             </div>
+
+            {/* Station Form Modal */}
+            {showModal && (
+                <StationFormModal
+                    station={editingStation}
+                    onSave={onSaveStation}
+                    onClose={() => { setShowModal(false); setEditingStation(null); }}
+                />
+            )}
         </div>
     );
 };

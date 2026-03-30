@@ -6,7 +6,6 @@ import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import { Station, AlertLevel } from '../types';
 import { MAP_CENTER, MAP_ZOOM_DEFAULT, MAP_RESIZE_DELAY_MS } from '../constants';
-import { useTheme } from '../context/ThemeContext';
 import { useAlerts } from '../hooks/useAlerts';
 
 // Fix Leaflet Default Icon — use local npm package assets (no CDN)
@@ -24,6 +23,10 @@ interface MapBoardProps {
     flyToCenter?: [number, number];
 }
 
+const ICON_SIZE = 36;
+const ICON_HALF = ICON_SIZE / 2;
+const EMOJI_SIZE = 18;
+
 /** Color-coded station icon based on alert level. Pulses on CRITICAL. */
 const createStationIcon = (alertLevel: AlertLevel | null, isSelected: boolean) => {
     const colors: Record<string, { bg: string; border: string; shadow: string }> = {
@@ -37,16 +40,16 @@ const createStationIcon = (alertLevel: AlertLevel | null, isSelected: boolean) =
     const pulse = alertLevel === 'CRITICAL'
         ? `<span style="position:absolute;inset:0;border-radius:inherit;background:${bg};opacity:0.4;animation:ping 1s cubic-bezier(0,0,0.2,1) infinite;"></span>`
         : '';
-    const ring = isSelected ? `box-shadow:0 0 0 3px white,0 0 0 5px ${bg};` : `box-shadow:0 4px 14px ${shadow};`;
+    const ring = isSelected ? `box-shadow:0 0 0 2px white,0 0 0 4px ${bg};` : `box-shadow:0 3px 10px ${shadow};`;
     const html = `
-        <div style="position:relative;width:40px;height:40px;">
+        <div style="position:relative;width:${ICON_SIZE}px;height:${ICON_SIZE}px;">
             ${pulse}
-            <div style="position:relative;background:${bg};border:2.5px solid ${border};${ring}width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;z-index:1;">
+            <div style="position:relative;background:${bg};border:2px solid ${border};${ring}width:${ICON_SIZE}px;height:${ICON_SIZE}px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:${EMOJI_SIZE}px;z-index:1;">
                 ⛽
             </div>
         </div>
     `;
-    return L.divIcon({ html, className: '', iconSize: [40, 40], iconAnchor: [20, 40] });
+    return L.divIcon({ html, className: '', iconSize: [ICON_SIZE, ICON_SIZE], iconAnchor: [ICON_HALF, ICON_SIZE] });
 };
 
 const FlyToLocation: React.FC<{ center?: [number, number] }> = ({ center }) => {
@@ -66,15 +69,13 @@ const MapResizer: React.FC = () => {
     return null;
 };
 
+// Always light mode for the map — user explicitly requested this
+const TILE_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+const TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>';
+
 const MapBoard: React.FC<MapBoardProps> = ({ stations, selectedStation, onStationSelect, flyToCenter }) => {
-    const { theme } = useTheme();
     const { getStationAlertMap } = useAlerts();
     const alertMap = getStationAlertMap();
-
-    const tileUrl = theme === 'dark'
-        ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-        : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-    const tileAttribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>';
 
     const activeStations = stations.filter(s => s.isActive);
 
@@ -86,11 +87,23 @@ const MapBoard: React.FC<MapBoardProps> = ({ stations, selectedStation, onStatio
                 center={MAP_CENTER}
                 zoom={MAP_ZOOM_DEFAULT}
                 style={{ height: '100%', width: '100%' }}
-                className="z-0"
+                className="z-0 map-always-light"
             >
-                <TileLayer key={theme} attribution={tileAttribution} url={tileUrl} />
+                <TileLayer attribution={TILE_ATTRIBUTION} url={TILE_URL} />
                 <MapResizer />
                 <FlyToLocation center={flyToCenter} />
+
+                {activeStations.length === 0 && (
+                    <div style={{
+                        position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                        zIndex: 1000, textAlign: 'center', padding: '24px 32px',
+                        background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(12px)',
+                        borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+                    }}>
+                        <p style={{ fontSize: '14px', fontWeight: 700, color: '#374151', margin: '0 0 4px' }}>Sin estaciones activas</p>
+                        <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>Agregá estaciones desde Ajustes para verlas en el mapa.</p>
+                    </div>
+                )}
 
                 {activeStations.map(station => {
                     const alertLevel  = alertMap.get(station.id) ?? null;
@@ -103,12 +116,12 @@ const MapBoard: React.FC<MapBoardProps> = ({ stations, selectedStation, onStatio
                             eventHandlers={{ click: () => onStationSelect(station) }}
                         >
                             <Popup>
-                                <div style={{ padding: '4px 2px', minWidth: '150px' }}>
-                                    <p style={{ fontWeight: 700, fontSize: '13px', margin: '0 0 2px', color: '#111' }}>{station.name}</p>
-                                    <p style={{ fontSize: '11px', color: '#6b7280', margin: '0 0 4px' }}>{station.address}</p>
+                                <div style={{ padding: '8px 4px', minWidth: '160px' }}>
+                                    <p style={{ fontWeight: 700, fontSize: '15px', margin: '0 0 4px', color: '#111' }}>{station.name}</p>
+                                    <p style={{ fontSize: '13px', color: '#6b7280', margin: '0 0 6px' }}>{station.address}</p>
                                     {alertLevel && (
                                         <p style={{
-                                            fontSize: '11px',
+                                            fontSize: '13px',
                                             fontWeight: 600,
                                             margin: 0,
                                             color: alertLevel === 'CRITICAL' ? '#ef4444' : alertLevel === 'WARNING' ? '#f97316' : '#3b82f6',

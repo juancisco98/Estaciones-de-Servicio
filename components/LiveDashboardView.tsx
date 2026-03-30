@@ -11,7 +11,7 @@ interface LiveDashboardViewProps {
     onViewOnMap: (station: Station) => void;
 }
 
-const today = new Date().toISOString().slice(0, 10);
+const getToday = () => new Date().toISOString().slice(0, 10);
 
 const KpiCard: React.FC<{ label: string; value: string | number; sub?: string; icon: React.ReactNode; colorClass: string; glowColor?: string }> = ({
     label, value, sub, icon, colorClass, glowColor,
@@ -83,11 +83,19 @@ const StationRow: React.FC<{
                 </p>
             </div>
 
-            {statusColor && (
-                <span className={`hidden lg:inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full bg-${statusColor}-100 dark:bg-${statusColor}-500/20 text-${statusColor}-700 dark:text-${statusColor}-400`}>
-                    {CLOSING_STATUS_LABELS[closingStatus!] ?? closingStatus}
-                </span>
-            )}
+            {statusColor && (() => {
+                const statusClasses: Record<string, string> = {
+                    amber: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
+                    green: 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400',
+                    red:   'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400',
+                    gray:  'bg-gray-100 dark:bg-gray-500/20 text-gray-700 dark:text-gray-400',
+                };
+                return (
+                    <span className={`hidden lg:inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full ${statusClasses[statusColor] ?? statusClasses.gray}`}>
+                        {CLOSING_STATUS_LABELS[closingStatus!] ?? closingStatus}
+                    </span>
+                );
+            })()}
 
             {alertCount > 0 && (
                 <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${badgeClass}`}>
@@ -115,13 +123,14 @@ const LiveDashboardView: React.FC<LiveDashboardViewProps> = ({
 }) => {
     const activeStations = stations.filter(s => s.isActive);
 
+    const todayStr = getToday();
     const metricsMap = useMemo(() => {
         const map = new Map<string, StationMetrics>();
         for (const s of activeStations) {
-            map.set(s.id, getStationMetrics(s.id, today, today));
+            map.set(s.id, getStationMetrics(s.id, todayStr, todayStr));
         }
         return map;
-    }, [activeStations, getStationMetrics]);
+    }, [activeStations, getStationMetrics, todayStr]);
 
     const unresolvedAlerts  = alerts.filter(a => !a.resolved);
     const criticalAlerts    = unresolvedAlerts.filter(a => a.level === 'CRITICAL');
@@ -167,7 +176,7 @@ const LiveDashboardView: React.FC<LiveDashboardViewProps> = ({
                     </div>
                     <h1 className="text-lg font-black text-gray-900 dark:text-white">En Vivo — Hoy</h1>
                     <span className="text-[10px] font-bold text-gray-400 dark:text-slate-500 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-full border border-gray-100 dark:border-white/10">
-                        {today}
+                        {todayStr}
                     </span>
                 </div>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

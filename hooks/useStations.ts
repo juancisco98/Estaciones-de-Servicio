@@ -41,14 +41,17 @@ export const useStations = () => {
 
     const deactivateStation = useCallback(async (id: string): Promise<boolean> => {
         try {
-            await supabaseUpsert('stations', { id, is_active: false }, 'estación');
-            setStations(prev => prev.map(s => s.id === id ? { ...s, isActive: false } : s));
-            toast.success('Estación desactivada');
+            const current = stations.find(s => s.id === id);
+            if (!current) return false;
+            const newActive = !current.isActive;
+            await supabaseUpsert('stations', { id, is_active: newActive }, 'estación');
+            setStations(prev => prev.map(s => s.id === id ? { ...s, isActive: newActive } : s));
+            toast.success(newActive ? 'Estación activada' : 'Estación desactivada');
             return true;
         } catch {
             return false;
         }
-    }, [setStations]);
+    }, [stations, setStations]);
 
     const getActiveStations = useCallback(() =>
         stations.filter(s => s.isActive),

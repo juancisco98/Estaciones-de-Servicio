@@ -9,15 +9,15 @@ interface SalesHistoryViewProps {
     currentUser: User | null;
 }
 
-const today = new Date().toISOString().slice(0, 10);
-const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+const getToday = () => new Date().toISOString().slice(0, 10);
+const getThirtyDaysAgo = () => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
 const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ stations, salesTransactions, currentUser }) => {
     const [selectedStation, setSelectedStation] = useState<string>(
         currentUser?.stationId ?? (stations[0]?.id ?? '')
     );
-    const [dateFrom, setDateFrom] = useState(thirtyDaysAgo);
-    const [dateTo, setDateTo]     = useState(today);
+    const [dateFrom, setDateFrom] = useState(getThirtyDaysAgo);
+    const [dateTo, setDateTo]     = useState(getToday);
     const [search, setSearch]     = useState('');
 
     const stationMap = useMemo(() => new Map(stations.map(s => [s.id, s.name])), [stations]);
@@ -44,19 +44,19 @@ const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ stations, salesTran
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
             {/* Header */}
-            <div className="shrink-0 p-4 pb-3 bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-white/10">
-                <div className="flex items-center gap-2 mb-4">
-                    <ShoppingCart className="w-5 h-5 text-amber-500" />
-                    <h1 className="text-xl font-black text-gray-900 dark:text-white">Historial de Ventas</h1>
+            <div className="shrink-0 p-5 pb-4 bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-white/10">
+                <div className="flex items-center gap-3 mb-5">
+                    <ShoppingCart className="w-6 h-6 text-amber-500" />
+                    <h1 className="text-2xl font-black text-gray-900 dark:text-white">Historial de Ventas</h1>
                 </div>
 
                 {/* Filters */}
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-3">
                     {currentUser?.role === 'ADMIN' && (
                         <select
                             value={selectedStation}
                             onChange={e => setSelectedStation(e.target.value)}
-                            className="text-sm rounded-xl bg-gray-100 dark:bg-slate-800 border border-transparent text-gray-800 dark:text-white px-3 py-2 focus:outline-none focus:border-amber-400"
+                            className="text-sm rounded-xl bg-gray-100 dark:bg-slate-800 border border-transparent text-gray-800 dark:text-white px-4 py-2.5 min-h-[44px] focus:outline-none focus:border-amber-400"
                         >
                             <option value="">Todas las estaciones</option>
                             {stations.map(s => (
@@ -70,33 +70,33 @@ const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ stations, salesTran
                             type="date"
                             value={dateFrom}
                             onChange={e => setDateFrom(e.target.value)}
-                            className="text-sm rounded-xl bg-gray-100 dark:bg-slate-800 border border-transparent text-gray-800 dark:text-white px-3 py-2 focus:outline-none focus:border-amber-400"
+                            className="text-sm rounded-xl bg-gray-100 dark:bg-slate-800 border border-transparent text-gray-800 dark:text-white px-4 py-2.5 min-h-[44px] focus:outline-none focus:border-amber-400"
                         />
                         <span className="text-gray-400 text-sm">—</span>
                         <input
                             type="date"
                             value={dateTo}
                             onChange={e => setDateTo(e.target.value)}
-                            className="text-sm rounded-xl bg-gray-100 dark:bg-slate-800 border border-transparent text-gray-800 dark:text-white px-3 py-2 focus:outline-none focus:border-amber-400"
+                            className="text-sm rounded-xl bg-gray-100 dark:bg-slate-800 border border-transparent text-gray-800 dark:text-white px-4 py-2.5 min-h-[44px] focus:outline-none focus:border-amber-400"
                         />
                     </div>
 
                     <div className="relative flex-1 min-w-[160px]">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                         <input
                             type="text"
                             value={search}
                             onChange={e => setSearch(e.target.value)}
                             placeholder="Producto, código, método..."
-                            className="w-full pl-8 pr-3 py-2 text-sm rounded-xl bg-gray-100 dark:bg-slate-800 border border-transparent focus:border-amber-400 focus:outline-none text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-slate-500"
+                            className="w-full pl-10 pr-4 py-2.5 min-h-[44px] text-sm rounded-xl bg-gray-100 dark:bg-slate-800 border border-transparent focus:border-amber-400 focus:outline-none text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-slate-500"
                         />
                     </div>
                 </div>
             </div>
 
             {/* Summary bar */}
-            <div className="shrink-0 px-4 py-2 bg-amber-50 dark:bg-amber-500/5 border-b border-amber-100 dark:border-amber-500/10">
-                <div className="flex items-center gap-6 text-xs font-semibold flex-wrap">
+            <div className="shrink-0 px-5 py-3 bg-amber-50 dark:bg-amber-500/5 border-b border-amber-100 dark:border-amber-500/10">
+                <div className="flex items-center gap-8 text-sm font-semibold flex-wrap">
                     <span className="text-gray-600 dark:text-gray-300">
                         <span className="text-gray-400 dark:text-slate-500 font-medium">Registros: </span>
                         <strong>{filtered.length.toLocaleString('es-AR')}</strong>
@@ -121,29 +121,25 @@ const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ stations, salesTran
             {/* Table */}
             <div className="flex-1 overflow-auto">
                 {filtered.length === 0 ? (
-                    <div className="py-20 text-center">
-                        <TrendingUp className="w-12 h-12 mx-auto text-gray-300 dark:text-slate-700 mb-3" />
-                        <p className="text-gray-400 dark:text-slate-500 font-medium">Sin transacciones para el período</p>
+                    <div className="py-24 text-center">
+                        <TrendingUp className="w-16 h-16 mx-auto text-gray-300 dark:text-slate-700 mb-4" />
+                        <p className="text-gray-400 dark:text-slate-500 font-medium text-base">Sin transacciones para el período</p>
                     </div>
                 ) : (
                     <table className="w-full text-sm">
-                        <thead className="sticky top-0 z-10" style={{
-                            background: 'rgba(255,255,255,0.85)',
-                            backdropFilter: 'blur(16px) saturate(180%)',
-                            WebkitBackdropFilter: 'blur(16px) saturate(180%)',
-                            borderBottom: '1px solid rgba(0,0,0,0.06)',
+                        <thead className="sticky top-0 z-10 bg-white/85 dark:bg-slate-900/90 backdrop-blur-xl border-b border-gray-100 dark:border-white/10" style={{
                             boxShadow: '0 1px 0 rgba(255,255,255,0.80)',
                         }}>
                             <tr>
-                                <th className="text-left px-4 py-2.5 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider whitespace-nowrap">Fecha/Hora</th>
+                                <th className="text-left px-5 py-3 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider whitespace-nowrap">Fecha/Hora</th>
                                 {currentUser?.role === 'ADMIN' && (
-                                    <th className="text-left px-4 py-2.5 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Estación</th>
+                                    <th className="text-left px-5 py-3 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Estación</th>
                                 )}
-                                <th className="text-left px-4 py-2.5 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Producto</th>
-                                <th className="text-right px-4 py-2.5 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Cantidad</th>
-                                <th className="text-right px-4 py-2.5 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Total</th>
-                                <th className="text-left px-4 py-2.5 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider hidden md:table-cell">Pago</th>
-                                <th className="text-left px-4 py-2.5 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider hidden lg:table-cell">Archivo</th>
+                                <th className="text-left px-5 py-3 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Producto</th>
+                                <th className="text-right px-5 py-3 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Cantidad</th>
+                                <th className="text-right px-5 py-3 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Total</th>
+                                <th className="text-left px-5 py-3 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider hidden md:table-cell">Pago</th>
+                                <th className="text-left px-5 py-3 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider hidden lg:table-cell">Archivo</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50 dark:divide-white/5">
@@ -152,19 +148,19 @@ const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ stations, salesTran
                                 return (
                                     <tr
                                         key={t.id}
-                                        className={`hover:bg-gray-50 dark:hover:bg-white/5 transition-colors ${
+                                        className={`hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors ${
                                             isAnomaly ? 'bg-red-50/50 dark:bg-red-500/5' : ''
                                         }`}
                                     >
-                                        <td className="px-4 py-2.5 whitespace-nowrap text-xs text-gray-500 dark:text-slate-400 font-mono">
+                                        <td className="px-5 py-4 whitespace-nowrap text-xs text-gray-500 dark:text-slate-400 font-mono">
                                             {new Date(t.transactionTs).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}
                                         </td>
                                         {currentUser?.role === 'ADMIN' && (
-                                            <td className="px-4 py-2.5 text-xs text-gray-600 dark:text-gray-300 max-w-[120px] truncate">
+                                            <td className="px-5 py-4 text-xs text-gray-600 dark:text-gray-300 max-w-[120px] truncate">
                                                 {stationMap.get(t.stationId) ?? t.stationId}
                                             </td>
                                         )}
-                                        <td className="px-4 py-2.5">
+                                        <td className="px-5 py-4">
                                             <div className="flex items-center gap-2">
                                                 {isAnomaly && <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />}
                                                 <div>
@@ -173,16 +169,16 @@ const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ stations, salesTran
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className={`px-4 py-2.5 text-right text-xs font-semibold ${isAnomaly ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                                        <td className={`px-5 py-4 text-right text-xs font-semibold ${isAnomaly ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
                                             {t.quantity.toLocaleString('es-AR', { maximumFractionDigits: 2 })}
                                         </td>
-                                        <td className="px-4 py-2.5 text-right text-xs font-bold text-gray-900 dark:text-white">
+                                        <td className="px-5 py-4 text-right text-xs font-bold text-gray-900 dark:text-white">
                                             ${t.totalAmount.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
                                         </td>
-                                        <td className="px-4 py-2.5 text-xs text-gray-500 dark:text-slate-400 hidden md:table-cell">
+                                        <td className="px-5 py-4 text-xs text-gray-500 dark:text-slate-400 hidden md:table-cell">
                                             {t.paymentMethod ? (PAYMENT_METHOD_LABELS[t.paymentMethod] ?? t.paymentMethod) : '—'}
                                         </td>
-                                        <td className="px-4 py-2.5 text-[10px] text-gray-400 dark:text-slate-500 font-mono hidden lg:table-cell truncate max-w-[100px]">
+                                        <td className="px-5 py-4 text-[10px] text-gray-400 dark:text-slate-500 font-mono hidden lg:table-cell truncate max-w-[100px]">
                                             {t.fileName}
                                         </td>
                                     </tr>

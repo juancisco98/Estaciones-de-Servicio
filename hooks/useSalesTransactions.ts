@@ -1,19 +1,32 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { SalesTransaction } from '../types';
 import { useDataContext } from '../context/DataContext';
 
 export const useSalesTransactions = () => {
-    const { salesTransactions } = useDataContext();
+    const { salesTransactions, dailyClosings } = useDataContext();
+
+    // Only show transactions for shifts that have a daily_closing (P/S files arrived)
+    const closedShiftKeys = useMemo(() => {
+        const keys = new Set<string>();
+        for (const c of dailyClosings) {
+            keys.add(`${c.stationId}::${c.shiftDate}`);
+        }
+        return keys;
+    }, [dailyClosings]);
+
+    const closedSalesTransactions = useMemo(() =>
+        salesTransactions.filter(t => closedShiftKeys.has(`${t.stationId}::${t.shiftDate}`)),
+    [salesTransactions, closedShiftKeys]);
 
     /** All transactions for a given station, newest first. */
     const getByStation = useCallback((stationId: string): SalesTransaction[] =>
-        salesTransactions.filter(t => t.stationId === stationId),
-    [salesTransactions]);
+        closedSalesTransactions.filter(t => t.stationId === stationId),
+    [closedSalesTransactions]);
 
     /** Transactions for a specific date (YYYY-MM-DD). */
     const getByDate = useCallback((stationId: string, date: string): SalesTransaction[] =>
-        salesTransactions.filter(t => t.stationId === stationId && t.shiftDate === date),
-    [salesTransactions]);
+        closedSalesTransactions.filter(t => t.stationId === stationId && t.shiftDate === date),
+    [closedSalesTransactions]);
 
     /** Transactions for a date range (inclusive). */
     const getByDateRange = useCallback((
@@ -21,12 +34,12 @@ export const useSalesTransactions = () => {
         from: string,
         to: string,
     ): SalesTransaction[] =>
-        salesTransactions.filter(t =>
+        closedSalesTransactions.filter(t =>
             t.stationId === stationId &&
             t.shiftDate >= from &&
             t.shiftDate <= to
         ),
-    [salesTransactions]);
+    [closedSalesTransactions]);
 
     /** Sum of total_amount for a station on a given date. */
     const getDailyRevenue = useCallback((stationId: string, date: string): number =>
@@ -42,8 +55,8 @@ export const useSalesTransactions = () => {
 
     /** Detect anomalous transactions (negative quantity). */
     const getAnomalies = useCallback((stationId: string): SalesTransaction[] =>
-        salesTransactions.filter(t => t.stationId === stationId && t.quantity < 0),
-    [salesTransactions]);
+        closedSalesTransactions.filter(t => t.stationId === stationId && t.quantity < 0),
+    [closedSalesTransactions]);
 
     /** Group by product for a date range — used in analytics. */
     const getProductBreakdown = useCallback((
@@ -71,7 +84,7 @@ export const useSalesTransactions = () => {
     }, [getByDateRange]);
 
     return {
-        salesTransactions,
+        salesTransactions: closedSalesTransactions,
         getByStation,
         getByDate,
         getByDateRange,

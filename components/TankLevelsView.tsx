@@ -25,9 +25,9 @@ const TankBar: React.FC<{ levelLiters: number; capacityLiters?: number; alertLev
         'rgba(16,185,129,0.30)';
 
     return (
-        <div className="w-full bg-gray-100 dark:bg-slate-800 rounded-full h-2" style={{ boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.10)' }}>
+        <div className="w-full bg-gray-100 dark:bg-slate-800 rounded-full h-3" style={{ boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.10)' }}>
             <div
-                className="h-2 rounded-full transition-all duration-500"
+                className="h-3 rounded-full transition-all duration-500"
                 style={{ width: `${pct}%`, background: barGradient, boxShadow: `0 1px 4px ${glowColor}` }}
             />
         </div>
@@ -53,12 +53,12 @@ const StationTankPanel: React.FC<{ station: Station }> = ({ station }) => {
                 'border-white/80 dark:border-white/8'
             }`}
             style={{
-                boxShadow: '0 0 0 1px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.80)',
+                boxShadow: '0 0 0 1px rgba(0,0,0,0.04), 0 2px 12px rgba(0,0,0,0.07), 0 6px 24px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.80)',
             }}
         >
             {/* Station header */}
             <button
-                className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
                 onClick={() => setExpanded(v => !v)}
             >
                 <div className="flex items-center gap-3">
@@ -68,18 +68,18 @@ const StationTankPanel: React.FC<{ station: Station }> = ({ station }) => {
                         'bg-emerald-500'
                     }`} />
                     <div className="text-left">
-                        <p className="font-bold text-sm text-gray-900 dark:text-white">{station.name}</p>
-                        <p className="text-xs text-gray-400 dark:text-slate-500">{station.stationCode ?? station.address}</p>
+                        <p className="font-bold text-base text-gray-900 dark:text-white">{station.name}</p>
+                        <p className="text-sm text-gray-400 dark:text-slate-500">{station.stationCode ?? station.address}</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
                     {criticalCount > 0 && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400">
+                        <span className="text-xs font-bold px-3 py-1 rounded-full bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400">
                             {criticalCount} críticos
                         </span>
                     )}
                     {warningCount > 0 && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400">
+                        <span className="text-xs font-bold px-3 py-1 rounded-full bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400">
                             {warningCount} bajos
                         </span>
                     )}
@@ -90,29 +90,29 @@ const StationTankPanel: React.FC<{ station: Station }> = ({ station }) => {
 
             {/* Tanks grid */}
             {expanded && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 p-4 border-t border-gray-50 dark:border-white/5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 p-5 border-t border-gray-50 dark:border-white/5">
                     {tanks.map(([tankId, tank]) => {
                         const level     = getTankAlertLevel(tank.levelLiters);
                         const textColor = level === 'CRITICAL' ? 'text-red-600 dark:text-red-400' :
                                           level === 'WARNING'  ? 'text-orange-600 dark:text-orange-400' :
                                           'text-emerald-600 dark:text-emerald-400';
                         return (
-                            <div key={tankId} className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3">
-                                <div className="flex items-center justify-between mb-2">
+                            <div key={tankId} className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4">
+                                <div className="flex items-center justify-between mb-3">
                                     <div>
-                                        <p className="text-xs font-bold text-gray-700 dark:text-gray-300">{tankId}</p>
-                                        <p className="text-[10px] text-gray-400 dark:text-slate-500">{tank.productName}</p>
+                                        <p className="text-sm font-bold text-gray-700 dark:text-gray-300">{tankId}</p>
+                                        <p className="text-xs text-gray-400 dark:text-slate-500">{tank.productName}</p>
                                     </div>
                                     {level !== 'OK' && (
-                                        <AlertTriangle className={`w-4 h-4 shrink-0 ${level === 'CRITICAL' ? 'text-red-500 animate-pulse' : 'text-orange-500'}`} />
+                                        <AlertTriangle className={`w-5 h-5 shrink-0 ${level === 'CRITICAL' ? 'text-red-500 animate-pulse' : 'text-orange-500'}`} />
                                     )}
                                 </div>
                                 <TankBar levelLiters={tank.levelLiters} capacityLiters={tank.capacityLiters} alertLevel={level} />
-                                <div className="flex items-center justify-between mt-1.5">
-                                    <p className={`text-sm font-black ${textColor}`}>
+                                <div className="flex items-center justify-between mt-2">
+                                    <p className={`text-base font-black ${textColor}`}>
                                         {tank.levelLiters.toLocaleString('es-AR', { maximumFractionDigits: 0 })} L
                                     </p>
-                                    <p className="text-[10px] text-gray-400 dark:text-slate-500">
+                                    <p className="text-xs text-gray-400 dark:text-slate-500">
                                         {new Date(tank.recordedAt).toLocaleString('es-AR', { timeStyle: 'short', dateStyle: 'short' })}
                                     </p>
                                 </div>
@@ -142,12 +142,12 @@ const TankLevelsView: React.FC<TankLevelsViewProps> = ({ stations, currentUser }
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
             {/* Header */}
-            <div className="shrink-0 p-4 pb-3 bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-white/10">
-                <div className="flex items-center gap-3 mb-3">
-                    <Droplets className="w-5 h-5 text-blue-500" />
-                    <h1 className="text-xl font-black text-gray-900 dark:text-white">Niveles de Tanques</h1>
+            <div className="shrink-0 p-5 pb-4 bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-white/10">
+                <div className="flex items-center gap-3 mb-4">
+                    <Droplets className="w-6 h-6 text-blue-500" />
+                    <h1 className="text-2xl font-black text-gray-900 dark:text-white">Niveles de Tanques</h1>
                 </div>
-                <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-4 flex-wrap">
                     <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-slate-400">
                         <span className="w-2 h-2 rounded-full bg-red-500" />
                         Crítico ({"<"}{TANK_CRITICAL_LITERS} L):
@@ -166,14 +166,14 @@ const TankLevelsView: React.FC<TankLevelsViewProps> = ({ stations, currentUser }
             </div>
 
             {/* Station panels */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
                 {activeStations.map(station => (
                     <StationTankPanel key={station.id} station={station} />
                 ))}
                 {activeStations.length === 0 && (
-                    <div className="py-20 text-center">
-                        <Droplets className="w-12 h-12 mx-auto text-gray-300 dark:text-slate-700 mb-3" />
-                        <p className="text-gray-400 dark:text-slate-500 font-medium">Sin estaciones activas</p>
+                    <div className="py-24 text-center">
+                        <Droplets className="w-16 h-16 mx-auto text-gray-300 dark:text-slate-700 mb-4" />
+                        <p className="text-gray-400 dark:text-slate-500 font-medium text-base">Sin estaciones activas</p>
                     </div>
                 )}
             </div>

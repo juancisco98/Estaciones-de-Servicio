@@ -26,7 +26,6 @@ import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 
 // Lazy load views
-const LiveDashboardView  = lazy(() => import('./components/LiveDashboardView'));
 const StationsView       = lazy(() => import('./components/StationsView'));
 const SalesHistoryView   = lazy(() => import('./components/SalesHistoryView'));
 const TankLevelsView     = lazy(() => import('./components/TankLevelsView'));
@@ -36,7 +35,7 @@ const AnalyticsDashboard = lazy(() => import('./components/AnalyticsDashboard'))
 const AdminSettings      = lazy(() => import('./components/AdminSettings'));
 const StationCard        = lazy(() => import('./components/StationCard'));
 
-const VALID_VIEWS: ViewState[] = ['LIVE', 'MAP', 'STATIONS', 'SALES', 'TANKS', 'ALERTS', 'RECONCILIATION', 'ANALYTICS', 'SETTINGS'];
+const VALID_VIEWS: ViewState[] = ['MAP', 'STATIONS', 'SALES', 'TANKS', 'ALERTS', 'RECONCILIATION', 'ANALYTICS', 'SETTINGS'];
 
 const LoadingFallback = () => (
   <div className="flex items-center justify-center h-full">
@@ -51,7 +50,7 @@ const LoadingFallback = () => (
 const Dashboard: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser]         = useState<User | null>(null);
-  const [currentView, setCurrentView]         = useState<ViewState>('LIVE');
+  const [currentView, setCurrentView]         = useState<ViewState>('MAP');
   const [isSidebarOpen, setIsSidebarOpen]     = useState(false);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   const [mapFlyTo, setMapFlyTo]               = useState<[number, number] | undefined>(undefined);
@@ -248,18 +247,17 @@ const Dashboard: React.FC = () => {
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <main className="flex-1 overflow-hidden relative">
 
-          {/* LIVE DASHBOARD */}
-          {currentView === 'LIVE' && (
-            <Suspense fallback={<LoadingFallback />}>
-              <LiveDashboardView
-                stations={stations}
-                alerts={alerts}
-                dailyClosings={dailyClosings}
-                getStationMetrics={getStationMetrics}
-                onViewOnMap={(station) => { setSelectedStation(station); setCurrentView('MAP'); }}
-              />
-            </Suspense>
-          )}
+          {/* Header — visible in all views for mobile access to menu/refresh/notifications */}
+          <Header
+            currentUser={currentUser}
+            onMenuClick={() => setIsSidebarOpen(true)}
+            onLogout={handleLogout}
+            onRefresh={refreshData}
+            isLoading={isLoading}
+            onMapSearch={currentView === 'MAP' ? (lat: number, lng: number) => setMapFlyTo([lat, lng]) : undefined}
+            unresolvedAlertCount={unresolvedAlertCount}
+            criticalAlertCount={criticalAlertCount}
+          />
 
           {/* MAP */}
           {currentView === 'MAP' && (
@@ -269,16 +267,6 @@ const Dashboard: React.FC = () => {
                 selectedStation={selectedStation}
                 onStationSelect={setSelectedStation}
                 flyToCenter={mapFlyTo}
-              />
-              <Header
-                currentUser={currentUser}
-                onMenuClick={() => setIsSidebarOpen(true)}
-                onLogout={handleLogout}
-                onRefresh={refreshData}
-                isLoading={isLoading}
-                onMapSearch={(lat, lng) => setMapFlyTo([lat, lng])}
-                unresolvedAlertCount={unresolvedAlertCount}
-                criticalAlertCount={criticalAlertCount}
               />
             </>
           )}

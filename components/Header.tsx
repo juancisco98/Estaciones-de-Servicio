@@ -42,7 +42,7 @@ const ThemeToggle: React.FC = () => {
         <button
             onClick={toggleTheme}
             aria-label="Cambiar tema"
-            className="relative w-[52px] h-[28px] rounded-full shrink-0 cursor-pointer
+            className="relative w-[56px] h-[30px] rounded-full shrink-0 cursor-pointer
                        bg-slate-200 dark:bg-slate-700
                        ring-1 ring-black/[0.06] dark:ring-white/10
                        transition-colors duration-300
@@ -110,21 +110,27 @@ const Header: React.FC<HeaderProps> = ({
         setIsSearching(true);
         try {
             const result = await geocodeAddress(searchQuery.trim());
-            if (result) { onMapSearch(result.lat, result.lng); setSearchQuery(''); }
+            if (result) {
+                onMapSearch(result.lat, result.lng);
+                setSearchQuery('');
+            } else {
+                const { toast } = await import('sonner');
+                toast.error('Dirección no encontrada', { description: 'Intentá con otra búsqueda o dirección más específica.' });
+            }
         } finally { setIsSearching(false); }
     };
 
     const totalBadge = unreadCount + unresolvedAlertCount;
 
     return (
-        <div className="absolute top-0 left-0 right-0 z-[800] p-3 sm:p-4 pointer-events-none">
+        <div className="absolute top-0 left-0 right-0 z-[800] p-4 sm:p-5 pointer-events-none">
             <div
                 className="pointer-events-auto max-w-full xl:max-w-7xl mx-auto
                            bg-white/75 dark:bg-slate-900/80
                            backdrop-blur-3xl
                            rounded-2xl sm:rounded-full
-                           p-2 sm:p-2
-                           flex items-center gap-2
+                           p-2.5 sm:p-3
+                           flex items-center gap-2.5
                            border border-white/70 dark:border-white/10"
                 style={{
                     boxShadow: '0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.8)',
@@ -136,18 +142,18 @@ const Header: React.FC<HeaderProps> = ({
                         onClick={onMenuClick}
                         className="lg:hidden p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-xl
                                    text-gray-700 dark:text-white transition-all active:scale-95
-                                   w-9 h-9 flex items-center justify-center"
+                                   w-11 h-11 flex items-center justify-center"
                         aria-label="Abrir menú"
                     >
-                        <Menu className="w-5 h-5" />
+                        <Menu className="w-6 h-6" />
                     </button>
-                    <div className="hidden sm:flex items-center gap-2.5 ml-1 mr-1">
-                        <div className="w-7 h-7 bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl flex items-center justify-center shadow-sm shadow-amber-400/40">
-                            <Fuel className="w-3.5 h-3.5 text-white" />
+                    <div className="hidden sm:flex items-center gap-3 ml-1 mr-1">
+                        <div className="w-9 h-9 bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl flex items-center justify-center shadow-sm shadow-amber-400/40">
+                            <Fuel className="w-4 h-4 text-white" />
                         </div>
                         <div className="flex flex-col">
-                            <h1 className="text-sm font-black text-gray-900 dark:text-white leading-none tracking-tight">Station-OS</h1>
-                            <p className="text-[9px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-tight">
+                            <h1 className="text-base font-black text-gray-900 dark:text-white leading-none tracking-tight">Station-OS</h1>
+                            <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-tight">
                                 {currentUser?.name?.split(' ')[0] || 'Admin'}
                             </p>
                         </div>
@@ -161,22 +167,21 @@ const Header: React.FC<HeaderProps> = ({
                 {onMapSearch && (
                     <form onSubmit={handleSearch} className="flex-1 min-w-0 mx-1">
                         <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 dark:text-slate-500 pointer-events-none" />
+                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-slate-500 pointer-events-none" />
                             <input
                                 type="text"
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
                                 placeholder="Buscar estación o dirección..."
-                                className="w-full pl-8.5 pr-4 py-2 rounded-xl
+                                className="w-full pl-10 pr-4 py-2.5 rounded-xl
                                            bg-gray-100/80 dark:bg-slate-800/80
                                            border border-gray-200/60 dark:border-white/8
                                            text-sm text-gray-800 dark:text-white
                                            placeholder-gray-400 dark:placeholder-slate-500
                                            focus:outline-none focus:ring-2 focus:ring-amber-400/50
                                            transition-all duration-150"
-                                style={{ fontSize: '13px' }}
                             />
-                            {isSearching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 animate-spin text-amber-500" />}
+                            {isSearching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-amber-500" />}
                         </div>
                     </form>
                 )}
@@ -193,10 +198,10 @@ const Header: React.FC<HeaderProps> = ({
                         disabled={isLoading}
                         className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-xl
                                    text-gray-500 dark:text-gray-400 transition-all active:scale-95
-                                   w-9 h-9 flex items-center justify-center disabled:opacity-40"
+                                   w-10 h-10 flex items-center justify-center disabled:opacity-40"
                         aria-label="Actualizar"
                     >
-                        {isLoading ? <Loader2 className="w-4 h-4 animate-spin text-amber-500" /> : <RefreshCw className="w-4 h-4" />}
+                        {isLoading ? <Loader2 className="w-[18px] h-[18px] animate-spin text-amber-500" /> : <RefreshCw className="w-[18px] h-[18px]" />}
                     </button>
 
                     {/* Theme toggle pill */}
@@ -209,14 +214,14 @@ const Header: React.FC<HeaderProps> = ({
                         <button
                             className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-xl
                                        text-gray-500 dark:text-gray-400 relative transition-all active:scale-95
-                                       w-9 h-9 flex items-center justify-center"
+                                       w-10 h-10 flex items-center justify-center"
                             onClick={() => setShowNotifications(v => !v)}
                             aria-label="Notificaciones"
                         >
-                            <Bell className="w-4 h-4" />
+                            <Bell className="w-[18px] h-[18px]" />
                             {totalBadge > 0 && (
-                                <span className={`absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-0.5
-                                                  text-white text-[9px] font-black rounded-full
+                                <span className={`absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-0.5
+                                                  text-white text-[10px] font-black rounded-full
                                                   border-2 border-white dark:border-slate-900
                                                   flex items-center justify-center leading-none
                                                   ${criticalAlertCount > 0 ? 'bg-red-500' : 'bg-amber-500'}`}>
@@ -226,12 +231,12 @@ const Header: React.FC<HeaderProps> = ({
                         </button>
 
                         {showNotifications && (
-                            <div className="absolute right-0 top-[46px] w-80 sm:w-96 z-[900]
+                            <div className="absolute right-0 sm:right-0 top-[46px] w-[calc(100vw-2rem)] sm:w-96 max-w-[400px] z-[900]
                                             bg-white/90 dark:bg-slate-900/95
                                             backdrop-blur-2xl
                                             border border-white/60 dark:border-white/10
                                             rounded-2xl overflow-hidden animate-scale-in"
-                                style={{ boxShadow: '0 20px 48px rgba(0,0,0,0.14), 0 4px 12px rgba(0,0,0,0.08)' }}
+                                style={{ boxShadow: '0 20px 48px rgba(0,0,0,0.14), 0 4px 12px rgba(0,0,0,0.08)', right: 'max(0px, calc(100% - 100vw + 2rem))' }}
                             >
                                 <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100/80 dark:border-white/8">
                                     <div className="flex items-center gap-2">
@@ -301,10 +306,10 @@ const Header: React.FC<HeaderProps> = ({
                         onClick={onLogout}
                         className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400
                                    rounded-xl text-gray-500 dark:text-gray-400 transition-all active:scale-95
-                                   w-9 h-9 flex items-center justify-center"
+                                   w-10 h-10 flex items-center justify-center"
                         aria-label="Cerrar sesión"
                     >
-                        <LogOut className="w-4 h-4" />
+                        <LogOut className="w-[18px] h-[18px]" />
                     </button>
                 </div>
             </div>

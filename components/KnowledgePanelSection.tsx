@@ -87,7 +87,19 @@ const ClassifyForm: React.FC<ClassifyFormProps> = ({ stationId, rawCode, onDone 
             onClick={() => setProductType(pt)}
             className={`text-[10px] font-bold px-2 py-1 rounded-full transition-all ${
               productType === pt
-                ? `bg-${colorKey}-100 dark:bg-${colorKey}-500/20 text-${colorKey}-700 dark:text-${colorKey}-400 ring-1 ring-${colorKey}-400/40`
+                ? (() => {
+                    const activeClasses: Record<string, string> = {
+                      amber:   'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 ring-1 ring-amber-400/40',
+                      emerald: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-400/40',
+                      teal:    'bg-teal-100 dark:bg-teal-500/20 text-teal-700 dark:text-teal-400 ring-1 ring-teal-400/40',
+                      blue:    'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400 ring-1 ring-blue-400/40',
+                      sky:     'bg-sky-100 dark:bg-sky-500/20 text-sky-700 dark:text-sky-400 ring-1 ring-sky-400/40',
+                      violet:  'bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-400 ring-1 ring-violet-400/40',
+                      rose:    'bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400 ring-1 ring-rose-400/40',
+                      gray:    'bg-gray-100 dark:bg-gray-500/20 text-gray-700 dark:text-gray-400 ring-1 ring-gray-400/40',
+                    };
+                    return activeClasses[colorKey] ?? activeClasses.gray;
+                  })()
                 : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-600'
             }`}
           >
