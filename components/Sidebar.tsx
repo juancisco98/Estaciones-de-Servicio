@@ -1,112 +1,264 @@
 import React from 'react';
-import { BarChart3, Scissors, History, Map as MapIcon, LogOut, X, Settings, Store, Activity, Wallet } from 'lucide-react';
+import {
+    Activity, Map as MapIcon, Fuel, ShoppingCart, Droplets,
+    AlertTriangle, BarChart3, Settings, LogOut, X, ClipboardCheck,
+    Gauge, Sun, Moon,
+} from 'lucide-react';
+import { User } from '../types';
+import { useTheme } from '../context/ThemeContext';
 
-export type ViewState = 'LIVE' | 'MAP' | 'BARBERSHOPS' | 'BARBERS' | 'SESSIONS' | 'ANALYTICS' | 'FINANCES' | 'SETTINGS';
+export type ViewState =
+    | 'LIVE'
+    | 'MAP'
+    | 'STATIONS'
+    | 'SALES'
+    | 'TANKS'
+    | 'ALERTS'
+    | 'RECONCILIATION'
+    | 'ANALYTICS'
+    | 'SETTINGS';
 
 interface SidebarProps {
-  isOpen: boolean;
-  onClose: () => void;
-  currentView: ViewState;
-  onViewChange: (view: ViewState) => void;
-  onLogout?: () => void;
-  permanent?: boolean; // desktop: always visible, no overlay
+    isOpen: boolean;
+    onClose: () => void;
+    currentView: ViewState;
+    onViewChange: (view: ViewState) => void;
+    onLogout?: () => void;
+    permanent?: boolean;
+    unresolvedAlertCount?: number;
+    criticalAlertCount?: number;
+    discrepancyCount?: number;
+    currentUser?: User | null;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentView, onViewChange, onLogout, permanent = false }) => {
-  const menuItems = [
-    { id: 'LIVE' as ViewState,        label: 'En Vivo',     icon: Activity },
-    { id: 'MAP' as ViewState,         label: 'Mapa',        icon: MapIcon },
-    { id: 'BARBERSHOPS' as ViewState, label: 'Barberías',   icon: Store },
-    { id: 'BARBERS' as ViewState,     label: 'Barberos',    icon: Scissors },
-    { id: 'SESSIONS' as ViewState,    label: 'Sesiones',    icon: History },
-    { id: 'ANALYTICS' as ViewState,   label: 'Analytics',   icon: BarChart3 },
-    { id: 'FINANCES' as ViewState,    label: 'Finanzas',    icon: Wallet },
-    { id: 'SETTINGS' as ViewState,    label: 'Ajustes',     icon: Settings },
-  ];
+interface MenuItem {
+    id: ViewState;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    badge?: number;
+    badgeVariant?: 'red' | 'amber';
+}
 
-  const SidebarContent = () => (
-    <div className={`flex flex-col h-full w-64 bg-white dark:bg-slate-950 border-r border-gray-100 dark:border-white/10 ${!permanent ? 'shadow-2xl' : ''}`}>
-      {/* Header */}
-      <div className="px-5 py-5 flex justify-between items-center border-b border-gray-100 dark:border-white/5 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-slate-900 dark:bg-slate-800 rounded-xl flex items-center justify-center">
-            <Scissors className="w-5 h-5 text-amber-400" />
-          </div>
-          <div>
-            <span className="font-black text-lg text-gray-900 dark:text-white tracking-tight">Rufianes</span>
-            <p className="text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-widest font-semibold -mt-0.5">Barbershop</p>
-          </div>
-        </div>
-        {!permanent && (
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full text-gray-500 dark:text-gray-400"
-            aria-label="Cerrar menú"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        )}
-      </div>
+const Sidebar: React.FC<SidebarProps> = ({
+    isOpen,
+    onClose,
+    currentView,
+    onViewChange,
+    onLogout,
+    permanent = false,
+    unresolvedAlertCount = 0,
+    criticalAlertCount = 0,
+    discrepancyCount = 0,
+    currentUser,
+}) => {
+    const { theme, toggleTheme } = useTheme();
 
-      {/* Nav */}
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {menuItems.map((item) => {
-          const isActive = currentView === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => { onViewChange(item.id); if (!permanent) onClose(); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-150 group ${
-                isActive
-                  ? 'bg-amber-500 text-white shadow-md shadow-amber-200/50 dark:shadow-none font-bold'
-                  : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white font-medium'
-              }`}
-            >
-              <div className={`p-1.5 rounded-xl transition-colors ${
-                isActive
-                  ? 'bg-white/20'
-                  : 'text-gray-400 group-hover:text-amber-500'
-              }`}>
-                <item.icon className="w-5 h-5" />
-              </div>
-              <span className="text-sm font-semibold tracking-tight">{item.label}</span>
-            </button>
-          );
-        })}
-      </nav>
+    const menuItems: MenuItem[] = [
+        { id: 'LIVE',           label: 'En Vivo',        icon: Activity },
+        { id: 'MAP',            label: 'Mapa de Red',    icon: MapIcon },
+        { id: 'STATIONS',       label: 'Estaciones',     icon: Gauge },
+        { id: 'SALES',          label: 'Ventas',         icon: ShoppingCart },
+        { id: 'TANKS',          label: 'Tanques',        icon: Droplets },
+        {
+            id: 'ALERTS',
+            label: 'Alertas',
+            icon: AlertTriangle,
+            badge: unresolvedAlertCount > 0 ? unresolvedAlertCount : undefined,
+            badgeVariant: criticalAlertCount > 0 ? 'red' : 'amber',
+        },
+        {
+            id: 'RECONCILIATION',
+            label: 'Reconciliación',
+            icon: ClipboardCheck,
+            badge: discrepancyCount > 0 ? discrepancyCount : undefined,
+            badgeVariant: 'red',
+        },
+        { id: 'ANALYTICS',      label: 'Analytics',      icon: BarChart3 },
+        { id: 'SETTINGS',       label: 'Ajustes',        icon: Settings },
+    ];
 
-      {/* Footer */}
-      <div className="p-4 border-t border-gray-100 dark:border-white/5 shrink-0">
-        {onLogout && (
-          <button
-            onClick={onLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-600 dark:text-rose-500 hover:bg-red-50 dark:hover:bg-rose-500/10 transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            <span className="text-sm font-medium">Cerrar Sesión</span>
-          </button>
-        )}
-      </div>
-    </div>
-  );
-
-  if (permanent) {
-    return <SidebarContent />;
-  }
-
-  return (
-    <>
-      {isOpen && (
+    const SidebarContent = () => (
         <div
-          className="fixed inset-0 bg-black/40 z-[1400] backdrop-blur-sm transition-opacity"
-          onClick={onClose}
-        />
-      )}
-      <div className={`fixed top-0 left-0 h-full z-[1500] transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <SidebarContent />
-      </div>
-    </>
-  );
+            className="flex flex-col h-full w-64 bg-white/85 dark:bg-slate-950/90 backdrop-blur-2xl border-r border-white/60 dark:border-white/8"
+            style={{
+                boxShadow: permanent
+                    ? 'none'
+                    : '4px 0 32px rgba(0,0,0,0.12), 2px 0 8px rgba(0,0,0,0.06)',
+            }}
+        >
+            {/* Header */}
+            <div className="px-5 pt-5 pb-4 flex justify-between items-center border-b border-gray-100/80 dark:border-white/5 shrink-0">
+                <div className="flex items-center gap-3">
+                    <div
+                        className="w-9 h-9 rounded-xl flex items-center justify-center"
+                        style={{
+                            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                            boxShadow: '0 4px 12px rgba(245,158,11,0.35), inset 0 1px 0 rgba(255,255,255,0.2)',
+                        }}
+                    >
+                        <Fuel className="w-4.5 h-4.5 text-white" />
+                    </div>
+                    <div>
+                        <span className="font-black text-base text-gray-900 dark:text-white tracking-tight">Station-OS</span>
+                        <p className="text-[10px] text-gray-400 dark:text-slate-500 uppercase tracking-widest font-semibold -mt-0.5">
+                            {currentUser?.role === 'OPERATOR' ? 'Operador' : 'Red Central'}
+                        </p>
+                    </div>
+                </div>
+                {!permanent && (
+                    <button
+                        onClick={onClose}
+                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full text-gray-400 transition-colors active:scale-90"
+                        aria-label="Cerrar menú"
+                    >
+                        <X className="w-4 h-4" />
+                    </button>
+                )}
+            </div>
+
+            {/* Nav */}
+            <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+                {menuItems.map((item) => {
+                    const isActive = currentView === item.id;
+                    return (
+                        <button
+                            key={item.id}
+                            onClick={() => { onViewChange(item.id); if (!permanent) onClose(); }}
+                            className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl transition-all group
+                                        ${isActive
+                                            ? 'text-white font-bold'
+                                            : 'text-gray-500 dark:text-slate-400 hover:bg-gray-50/80 dark:hover:bg-slate-800/70 hover:text-gray-900 dark:hover:text-white font-medium'
+                                        }`}
+                            style={isActive ? {
+                                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                boxShadow: '0 4px 14px rgba(245,158,11,0.30), 0 2px 4px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.18)',
+                            } : {}}
+                        >
+                            <div className={`p-1.5 rounded-xl transition-all duration-150 ${
+                                isActive
+                                    ? 'bg-white/20'
+                                    : 'text-gray-400 dark:text-slate-500 group-hover:text-amber-500 group-hover:bg-amber-50 dark:group-hover:bg-amber-500/10'
+                            }`}>
+                                <item.icon className="w-4 h-4" />
+                            </div>
+                            <span className="text-sm font-semibold tracking-tight flex-1 text-left">{item.label}</span>
+                            {item.badge !== undefined && (
+                                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none ${
+                                    isActive
+                                        ? 'bg-white/25 text-white'
+                                        : item.badgeVariant === 'red'
+                                            ? 'bg-red-500 text-white'
+                                            : 'bg-amber-500 text-white'
+                                }`}>
+                                    {item.badge > 99 ? '99+' : item.badge}
+                                </span>
+                            )}
+                        </button>
+                    );
+                })}
+            </nav>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-gray-100/80 dark:border-white/5 space-y-2 shrink-0">
+
+                {/* Dark mode toggle */}
+                <div className="flex items-center justify-between px-3 py-2.5 rounded-2xl bg-gray-50/80 dark:bg-slate-800/60">
+                    <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 rounded-xl bg-white dark:bg-slate-700/60" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                            {theme === 'dark'
+                                ? <Moon className="w-3.5 h-3.5 text-amber-400" />
+                                : <Sun className="w-3.5 h-3.5 text-amber-500" />
+                            }
+                        </div>
+                        <span className="text-xs font-semibold text-gray-600 dark:text-slate-300">
+                            {theme === 'dark' ? 'Modo Noche' : 'Modo Día'}
+                        </span>
+                    </div>
+                    {/* pill toggle */}
+                    <button
+                        onClick={toggleTheme}
+                        className="relative w-[44px] h-[24px] rounded-full cursor-pointer shrink-0
+                                   bg-slate-200 dark:bg-slate-600
+                                   ring-1 ring-black/[0.06] dark:ring-white/10
+                                   transition-colors duration-300
+                                   focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                        style={{ boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.10)' }}
+                    >
+                        <span
+                            className="absolute inset-0 rounded-full transition-opacity duration-300"
+                            style={{
+                                background: 'linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)',
+                                opacity: theme === 'dark' ? 1 : 0,
+                            }}
+                        />
+                        <span
+                            className="absolute top-[3px] w-[18px] h-[18px] rounded-full bg-white dark:bg-amber-400 transition-all duration-300"
+                            style={{
+                                left: theme === 'dark' ? '23px' : '3px',
+                                transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+                                boxShadow: '0 1px 4px rgba(0,0,0,0.20)',
+                            }}
+                        />
+                    </button>
+                </div>
+
+                {/* User info */}
+                {currentUser && (
+                    <div className="flex items-center gap-3 px-2 py-1.5">
+                        {currentUser.photoURL ? (
+                            <img src={currentUser.photoURL} alt={currentUser.name} className="w-8 h-8 rounded-full object-cover ring-2 ring-white dark:ring-slate-700" />
+                        ) : (
+                            <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400 font-bold text-sm">
+                                {currentUser.name[0].toUpperCase()}
+                            </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{currentUser.name}</p>
+                            <p className="text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider">{currentUser.role}</p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Logout */}
+                {onLogout && (
+                    <button
+                        onClick={onLogout}
+                        className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl
+                                   text-red-600 dark:text-rose-500
+                                   hover:bg-red-50 dark:hover:bg-rose-500/10
+                                   transition-all active:scale-98"
+                    >
+                        <div className="p-1.5 rounded-xl text-red-500 dark:text-rose-500">
+                            <LogOut className="w-4 h-4" />
+                        </div>
+                        <span className="text-sm font-semibold">Cerrar Sesión</span>
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+
+    if (permanent) return <SidebarContent />;
+
+    return (
+        <>
+            {isOpen && (
+                <div
+                    className="fixed inset-0 bg-black/40 z-[1400] backdrop-blur-sm"
+                    style={{ transition: 'opacity 250ms ease' }}
+                    onClick={onClose}
+                />
+            )}
+            <div
+                className={`fixed top-0 left-0 h-full z-[1500] transform transition-transform duration-300 ${
+                    isOpen ? 'translate-x-0' : '-translate-x-full'
+                }`}
+                style={{ transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)' }}
+            >
+                <SidebarContent />
+            </div>
+        </>
+    );
 };
 
 export default React.memo(Sidebar);

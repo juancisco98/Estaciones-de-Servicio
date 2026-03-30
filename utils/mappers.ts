@@ -1,254 +1,347 @@
 /**
- * RUFIANES — Mappers DB ↔ App
+ * Station-OS — Mappers DB ↔ App
  *
- * Convención:
- *  dbTo*   → Supabase row (snake_case) → App interface (camelCase)
- *  *ToDb   → App interface (camelCase) → Supabase payload (snake_case)
+ * Convention:
+ *  dbTo*  → Supabase row (snake_case) → App interface (camelCase)
+ *  *ToDb  → App interface (camelCase) → Supabase payload (snake_case)
+ *
+ * Rules (from CLAUDE.md):
+ *  - Optional fields: ?? undefined on read, ?? null on write
+ *  - Numbers: Number(row.field) to handle DB string→number coercion
+ *  - Conditional payload: only include optional columns if defined (avoids schema errors)
  */
 
 import {
-  Barbershop,
-  Barber,
-  Service,
-  Client,
-  HaircutSession,
-  ShiftClosing,
+  Station,
+  Employee,
+  SalesTransaction,
+  CardPayment,
+  TankLevel,
+  TankId,
+  DailyClosing,
+  ClosingStatus,
+  Alert,
+  AlertLevel,
+  AlertType,
   AppNotification,
-  PaymentMethod,
   NotificationType,
-  WeekSchedule,
-  ShiftClosingMetadata,
+  PaymentMethod,
+  EmployeeRole,
+  StationKnowledge,
+  KnowledgeProduct,
+  KnowledgeAccount,
+  ProductType,
+  AccountType,
 } from '../types';
 
 import {
-  DbBarbershopRow,
-  DbBarberRow,
-  DbServiceRow,
-  DbClientRow,
-  DbHaircutSessionRow,
-  DbShiftClosingRow,
+  DbStationRow,
+  DbEmployeeRow,
+  DbSalesTransactionRow,
+  DbCardPaymentRow,
+  DbTankLevelRow,
+  DbDailyClosingRow,
+  DbAlertRow,
   DbNotificationRow,
+  DbStationKnowledgeRow,
 } from '../types/dbRows';
 
-// ─── BARBERSHOP ───────────────────────────────────────────────────────────────
+// ─── STATION ─────────────────────────────────────────────────────────────────
 
-export const dbToBarbershop = (row: DbBarbershopRow): Barbershop => ({
-  id: row.id,
-  name: row.name,
-  address: row.address,
+export const dbToStation = (row: DbStationRow): Station => ({
+  id:          row.id,
+  name:        row.name,
+  address:     row.address,
   coordinates: row.coordinates,
-  neighborhood: row.neighborhood ?? undefined,
-  phone: row.phone ?? undefined,
-  imageUrl: row.image_url ?? undefined,
-  isActive: row.is_active,
+  city:        row.city ?? undefined,
+  province:    row.province ?? undefined,
+  phone:       row.phone ?? undefined,
   managerName: row.manager_name ?? undefined,
-  notes: row.notes ?? undefined,
-  chairCount: row.chair_count ?? undefined,
-  openingHours: row.opening_hours
-    ? (row.opening_hours as unknown as WeekSchedule)
-    : undefined,
-  createdAt: row.created_at,
-  updatedAt: row.updated_at,
+  isActive:    row.is_active,
+  stationCode: row.station_code ?? undefined,
+  watchPath:   row.watch_path ?? undefined,
+  notes:       row.notes ?? undefined,
+  createdAt:   row.created_at,
+  updatedAt:   row.updated_at,
 });
 
-export const barbershopToDb = (shop: Barbershop): Record<string, unknown> => {
+export const stationToDb = (station: Station): Record<string, unknown> => {
   const payload: Record<string, unknown> = {
-    id: shop.id,
-    name: shop.name,
-    address: shop.address,
-    coordinates: shop.coordinates,
-    neighborhood: shop.neighborhood ?? null,
-    phone: shop.phone ?? null,
-    image_url: shop.imageUrl ?? null,
-    is_active: shop.isActive,
-    manager_name: shop.managerName ?? null,
-    notes: shop.notes ?? null,
+    id:          station.id,
+    name:        station.name,
+    address:     station.address,
+    coordinates: station.coordinates,
+    city:        station.city ?? null,
+    province:    station.province ?? null,
+    phone:       station.phone ?? null,
+    manager_name: station.managerName ?? null,
+    is_active:   station.isActive,
+    notes:       station.notes ?? null,
   };
-  // Solo incluir si la columna existe (requiere migración SQL en Supabase)
-  if (shop.chairCount !== undefined) payload.chair_count = shop.chairCount;
-  if (shop.openingHours !== undefined) payload.opening_hours = shop.openingHours;
+  if (station.stationCode !== undefined) payload.station_code = station.stationCode;
+  if (station.watchPath   !== undefined) payload.watch_path   = station.watchPath;
   return payload;
 };
 
-// ─── BARBER ───────────────────────────────────────────────────────────────────
+// ─── EMPLOYEE ────────────────────────────────────────────────────────────────
 
-export const dbToBarber = (row: DbBarberRow): Barber => ({
-  id: row.id,
-  barbershopId: row.barbershop_id,
-  name: row.name,
-  phone: row.phone ?? undefined,
-  email: row.email ?? undefined,
-  photoUrl: row.photo_url ?? undefined,
-  specialties: row.specialties ?? [],
-  commissionPct: Number(row.commission_pct),
-  isActive: row.is_active,
-  hireDate: row.hire_date ?? undefined,
-  notes: row.notes ?? undefined,
-  createdAt: row.created_at,
+export const dbToEmployee = (row: DbEmployeeRow): Employee => ({
+  id:         row.id,
+  stationId:  row.station_id,
+  name:       row.name,
+  email:      row.email ?? undefined,
+  role:       row.role as EmployeeRole,
+  isActive:   row.is_active,
+  hireDate:   row.hire_date ?? undefined,
+  notes:      row.notes ?? undefined,
+  createdAt:  row.created_at,
 });
 
-export const barberToDb = (barber: Barber): Record<string, unknown> => ({
-  id: barber.id,
-  barbershop_id: barber.barbershopId,
-  name: barber.name,
-  phone: barber.phone ?? null,
-  email: barber.email ? barber.email.trim().toLowerCase() : null,
-  photo_url: barber.photoUrl ?? null,
-  specialties: barber.specialties,
-  commission_pct: barber.commissionPct,
-  is_active: barber.isActive,
-  hire_date: barber.hireDate ?? null,
-  notes: barber.notes ?? null,
+export const employeeToDb = (emp: Employee): Record<string, unknown> => ({
+  id:         emp.id,
+  station_id: emp.stationId,
+  name:       emp.name,
+  email:      emp.email ? emp.email.trim().toLowerCase() : null,
+  role:       emp.role,
+  is_active:  emp.isActive,
+  hire_date:  emp.hireDate ?? null,
+  notes:      emp.notes ?? null,
 });
 
-// ─── SERVICE ──────────────────────────────────────────────────────────────────
+// ─── SALES TRANSACTION ───────────────────────────────────────────────────────
 
-export const dbToService = (row: DbServiceRow): Service => ({
-  id: row.id,
-  barbershopId: row.barbershop_id ?? undefined,
-  name: row.name,
-  description: row.description ?? undefined,
-  basePrice: Number(row.base_price),
-  durationMins: row.duration_mins,
-  isActive: row.is_active,
-  createdAt: row.created_at,
+export const dbToSalesTransaction = (row: DbSalesTransactionRow): SalesTransaction => ({
+  id:              row.id,
+  stationId:       row.station_id,
+  fileName:        row.file_name,
+  transactionTs:   row.transaction_ts,
+  productCode:     row.product_code,
+  productName:     row.product_name,
+  quantity:        Number(row.quantity),
+  unitPrice:       Number(row.unit_price),
+  totalAmount:     Number(row.total_amount),
+  paymentMethod:   row.payment_method as PaymentMethod ?? undefined,
+  shiftDate:       row.shift_date,
+  dailyClosingId:  row.daily_closing_id ?? undefined,
+  rawLine:         row.raw_line ?? undefined,
+  ingestedAt:      row.ingested_at,
 });
 
-export const serviceToDb = (service: Service): Record<string, unknown> => ({
-  id: service.id,
-  barbershop_id: service.barbershopId ?? null,
-  name: service.name,
-  description: service.description ?? null,
-  base_price: service.basePrice,
-  duration_mins: service.durationMins,
-  is_active: service.isActive,
+export const salesTransactionToDb = (tx: SalesTransaction): Record<string, unknown> => ({
+  id:               tx.id,
+  station_id:       tx.stationId,
+  file_name:        tx.fileName,
+  transaction_ts:   tx.transactionTs,
+  product_code:     tx.productCode,
+  product_name:     tx.productName,
+  quantity:         tx.quantity,
+  unit_price:       tx.unitPrice,
+  total_amount:     tx.totalAmount,
+  payment_method:   tx.paymentMethod ?? null,
+  shift_date:       tx.shiftDate,
+  daily_closing_id: tx.dailyClosingId ?? null,
+  raw_line:         tx.rawLine ?? null,
 });
 
-// ─── CLIENT ───────────────────────────────────────────────────────────────────
+// ─── CARD PAYMENT ─────────────────────────────────────────────────────────────
 
-export const dbToClient = (row: DbClientRow): Client => ({
-  id: row.id,
-  barbershopId: row.barbershop_id ?? undefined,
-  name: row.name,
-  phone: row.phone ?? undefined,
-  notes: row.notes ?? undefined,
-  createdAt: row.created_at,
+export const dbToCardPayment = (row: DbCardPaymentRow): CardPayment => ({
+  id:             row.id,
+  stationId:      row.station_id,
+  fileName:       row.file_name,
+  paymentTs:      row.payment_ts ?? undefined,
+  paymentType:    row.payment_type as PaymentMethod,
+  accountName:    row.account_name ?? undefined,
+  amount:         Number(row.amount),
+  referenceCode:  row.reference_code ?? undefined,
+  shiftDate:      row.shift_date ?? undefined,
+  dailyClosingId: row.daily_closing_id ?? undefined,
+  rawLine:        row.raw_line ?? undefined,
+  ingestedAt:     row.ingested_at,
 });
 
-export const clientToDb = (client: Client): Record<string, unknown> => ({
-  id: client.id,
-  barbershop_id: client.barbershopId ?? null,
-  name: client.name,
-  phone: client.phone ?? null,
-  notes: client.notes ?? null,
+export const cardPaymentToDb = (cp: CardPayment): Record<string, unknown> => ({
+  id:              cp.id,
+  station_id:      cp.stationId,
+  file_name:       cp.fileName,
+  payment_ts:      cp.paymentTs ?? null,
+  payment_type:    cp.paymentType,
+  account_name:    cp.accountName ?? null,
+  amount:          cp.amount,
+  reference_code:  cp.referenceCode ?? null,
+  shift_date:      cp.shiftDate ?? null,
+  daily_closing_id: cp.dailyClosingId ?? null,
+  raw_line:        cp.rawLine ?? null,
 });
 
-// ─── HAIRCUT SESSION ──────────────────────────────────────────────────────────
+// ─── TANK LEVEL ───────────────────────────────────────────────────────────────
 
-export const dbToHaircutSession = (row: DbHaircutSessionRow): HaircutSession => ({
-  id: row.id,
-  barbershopId: row.barbershop_id,
-  barberId: row.barber_id,
-  clientId: row.client_id ?? undefined,
-  clientName: row.client_name ?? undefined,
-  serviceId: row.service_id ?? undefined,
-  serviceName: row.service_name,
-  price: Number(row.price),
-  commissionPct: Number(row.commission_pct),
-  commissionAmt: Number(row.commission_amt),
-  paymentMethod: row.payment_method as PaymentMethod,
-  startedAt: row.started_at,
-  endedAt: row.ended_at ?? undefined,
-  durationMins: row.duration_mins ?? undefined,
-  shiftClosingId: row.shift_closing_id ?? undefined,
-  notes: row.notes ?? undefined,
-  createdAt: row.created_at,
+export const dbToTankLevel = (row: DbTankLevelRow): TankLevel => ({
+  id:             row.id,
+  stationId:      row.station_id,
+  fileName:       row.file_name,
+  recordedAt:     row.recorded_at,
+  shiftDate:      row.shift_date ?? undefined,
+  tankId:         row.tank_id as TankId,
+  productCode:    row.product_code,
+  productName:    row.product_name,
+  levelLiters:    Number(row.level_liters),
+  capacityLiters: row.capacity_liters != null ? Number(row.capacity_liters) : undefined,
+  rawLine:        row.raw_line ?? undefined,
+  ingestedAt:     row.ingested_at,
 });
 
-export const haircutSessionToDb = (session: HaircutSession): Record<string, unknown> => ({
-  id: session.id,
-  barbershop_id: session.barbershopId,
-  barber_id: session.barberId,
-  client_id: session.clientId ?? null,
-  client_name: session.clientName ?? null,
-  service_id: session.serviceId ?? null,
-  service_name: session.serviceName,
-  price: session.price,
-  commission_pct: session.commissionPct,
-  commission_amt: session.commissionAmt,
-  payment_method: session.paymentMethod,
-  started_at: session.startedAt,
-  ended_at: session.endedAt ?? null,
-  duration_mins: session.durationMins ?? null,
-  shift_closing_id: session.shiftClosingId ?? null,
-  notes: session.notes ?? null,
+export const tankLevelToDb = (tl: TankLevel): Record<string, unknown> => ({
+  id:              tl.id,
+  station_id:      tl.stationId,
+  file_name:       tl.fileName,
+  recorded_at:     tl.recordedAt,
+  shift_date:      tl.shiftDate ?? null,
+  tank_id:         tl.tankId,
+  product_code:    tl.productCode,
+  product_name:    tl.productName,
+  level_liters:    tl.levelLiters,
+  capacity_liters: tl.capacityLiters ?? null,
+  raw_line:        tl.rawLine ?? null,
 });
 
-// ─── SHIFT CLOSING ────────────────────────────────────────────────────────────
+// ─── DAILY CLOSING ────────────────────────────────────────────────────────────
 
-export const dbToShiftClosing = (row: DbShiftClosingRow): ShiftClosing => ({
-  id: row.id,
-  barbershopId: row.barbershop_id,
-  barberId: row.barber_id,
-  shiftDate: row.shift_date,
-  startedAt: row.started_at ?? undefined,
-  closedAt: row.closed_at,
-  totalCuts: row.total_cuts,
-  totalCash: Number(row.total_cash),
-  totalCard: Number(row.total_card),
-  totalTransfer: Number(row.total_transfer),
-  totalRevenue: Number(row.total_revenue),
-  totalCommission: Number(row.total_commission),
-  expensesCash: Number(row.expenses_cash),
-  expensesDetail: row.expenses_detail ?? [],
-  netCashToHand: row.net_cash_to_hand != null ? Number(row.net_cash_to_hand) : undefined,
-  notes: row.notes ?? undefined,
-  status: row.status as 'OPEN' | 'CLOSED',
-  createdAt: row.created_at,
+export const dbToDailyClosing = (row: DbDailyClosingRow): DailyClosing => ({
+  id:                   row.id,
+  stationId:            row.station_id,
+  shiftDate:            row.shift_date,
+  forecourtTotal:       row.forecourt_total    != null ? Number(row.forecourt_total)    : undefined,
+  shopTotal:            row.shop_total         != null ? Number(row.shop_total)         : undefined,
+  transactionsTotal:    row.transactions_total != null ? Number(row.transactions_total) : undefined,
+  reconciliationDiff:   row.reconciliation_diff != null ? Number(row.reconciliation_diff) : undefined,
+  reconciliationOk:     row.reconciliation_ok,
+  pFileName:            row.p_file_name ?? undefined,
+  sFileName:            row.s_file_name ?? undefined,
+  status:               row.status as ClosingStatus,
+  notes:                row.notes ?? undefined,
+  createdAt:            row.created_at,
+  updatedAt:            row.updated_at,
 });
 
-export const shiftClosingToDb = (closing: ShiftClosing): Record<string, unknown> => ({
-  id: closing.id,
-  barbershop_id: closing.barbershopId,
-  barber_id: closing.barberId,
-  shift_date: closing.shiftDate,
-  started_at: closing.startedAt ?? null,
-  closed_at: closing.closedAt,
-  total_cuts: closing.totalCuts,
-  total_cash: closing.totalCash,
-  total_card: closing.totalCard,
-  total_transfer: closing.totalTransfer,
-  total_revenue: closing.totalRevenue,
-  total_commission: closing.totalCommission,
-  expenses_cash: closing.expensesCash,
-  expenses_detail: closing.expensesDetail,
-  net_cash_to_hand: closing.netCashToHand ?? null,
-  notes: closing.notes ?? null,
-  status: closing.status,
+export const dailyClosingToDb = (dc: DailyClosing): Record<string, unknown> => {
+  const payload: Record<string, unknown> = {
+    id:                  dc.id,
+    station_id:          dc.stationId,
+    shift_date:          dc.shiftDate,
+    reconciliation_ok:   dc.reconciliationOk,
+    status:              dc.status,
+    notes:               dc.notes ?? null,
+  };
+  if (dc.forecourtTotal    !== undefined) payload.forecourt_total    = dc.forecourtTotal;
+  if (dc.shopTotal         !== undefined) payload.shop_total         = dc.shopTotal;
+  if (dc.transactionsTotal !== undefined) payload.transactions_total = dc.transactionsTotal;
+  if (dc.reconciliationDiff !== undefined) payload.reconciliation_diff = dc.reconciliationDiff;
+  if (dc.pFileName         !== undefined) payload.p_file_name        = dc.pFileName;
+  if (dc.sFileName         !== undefined) payload.s_file_name        = dc.sFileName;
+  return payload;
+};
+
+// ─── ALERT ────────────────────────────────────────────────────────────────────
+
+export const dbToAlert = (row: DbAlertRow): Alert => ({
+  id:          row.id,
+  stationId:   row.station_id ?? undefined,
+  level:       row.level as AlertLevel,
+  type:        row.type as AlertType,
+  title:       row.title,
+  message:     row.message,
+  relatedDate: row.related_date ?? undefined,
+  relatedFile: row.related_file ?? undefined,
+  resolved:    row.resolved,
+  resolvedAt:  row.resolved_at ?? undefined,
+  resolvedBy:  row.resolved_by ?? undefined,
+  metadata:    row.metadata ?? undefined,
+  createdAt:   row.created_at,
+});
+
+export const alertToDb = (alert: Alert): Record<string, unknown> => ({
+  id:           alert.id,
+  station_id:   alert.stationId ?? null,
+  level:        alert.level,
+  type:         alert.type,
+  title:        alert.title,
+  message:      alert.message,
+  related_date: alert.relatedDate ?? null,
+  related_file: alert.relatedFile ?? null,
+  resolved:     alert.resolved,
+  resolved_at:  alert.resolvedAt ?? null,
+  resolved_by:  alert.resolvedBy ?? null,
+  metadata:     alert.metadata ?? null,
 });
 
 // ─── NOTIFICATION ─────────────────────────────────────────────────────────────
 
 export const dbToNotification = (row: DbNotificationRow): AppNotification => ({
-  id: row.id,
+  id:             row.id,
   recipientEmail: row.recipient_email,
-  title: row.title,
-  message: row.message,
-  type: row.type as NotificationType,
-  relatedId: row.related_id ?? undefined,
-  read: row.read,
-  createdAt: row.created_at,
-  metadata: row.metadata as unknown as ShiftClosingMetadata | undefined,
+  title:          row.title,
+  message:        row.message,
+  type:           row.type as NotificationType,
+  relatedId:      row.related_id ?? undefined,
+  read:           row.read,
+  createdAt:      row.created_at,
+  metadata:       row.metadata ?? undefined,
 });
 
 export const notificationToDb = (n: AppNotification): Record<string, unknown> => ({
-  id: n.id,
+  id:              n.id,
   recipient_email: n.recipientEmail,
-  type: n.type,
-  title: n.title,
-  message: n.message,
-  related_id: n.relatedId ?? null,
-  read: n.read,
-  created_at: n.createdAt,
-  metadata: n.metadata ?? null,
+  type:            n.type,
+  title:           n.title,
+  message:         n.message,
+  related_id:      n.relatedId ?? null,
+  read:            n.read,
+  created_at:      n.createdAt,
+  metadata:        n.metadata ?? null,
 });
+
+// ─── STATION KNOWLEDGE ────────────────────────────────────────────────────────
+
+export const dbToStationKnowledge = (row: DbStationKnowledgeRow): StationKnowledge => {
+  const blob = row.knowledge_blob ?? {};
+  return {
+    id:        row.id,
+    stationId: row.station_id,
+    version:   row.version,
+    lastUpdated: row.last_updated,
+    knowledgeBlob: {
+      schemaVersion: blob.schema_version ?? 1,
+      products: Object.fromEntries(
+        Object.entries(blob.products ?? {}).map(([code, p]) => [
+          code,
+          {
+            canonicalName:   p.canonical_name,
+            productType:     p.product_type as ProductType,
+            aliases:         p.aliases ?? [],
+            occurrenceCount: p.occurrence_count,
+          } satisfies KnowledgeProduct,
+        ])
+      ),
+      paymentAccounts: Object.fromEntries(
+        Object.entries(blob.payment_accounts ?? {}).map(([code, a]) => [
+          code,
+          {
+            canonicalName:   a.canonical_name,
+            accountType:     a.account_type as AccountType,
+            aliases:         a.aliases ?? [],
+            occurrenceCount: a.occurrence_count,
+          } satisfies KnowledgeAccount,
+        ])
+      ),
+      anomalyBaselines: {
+        dailyFuelLitersP50:       blob.anomaly_baselines?.daily_fuel_liters_p50 ?? 4500,
+        cashVarianceTolerancePct: blob.anomaly_baselines?.cash_variance_tolerance_pct ?? 0.1,
+        minTankAlertLiters:       blob.anomaly_baselines?.min_tank_alert_liters ?? 800,
+        criticalTankLiters:       blob.anomaly_baselines?.critical_tank_liters ?? 300,
+      },
+      unknownProductCodes: blob.unknown_product_codes ?? [],
+      unknownAccountNames: blob.unknown_account_names ?? [],
+    },
+  };
+};

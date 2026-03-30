@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Scissors, ArrowRight, Loader2 } from 'lucide-react';
+import { Fuel, ArrowRight, Loader2 } from 'lucide-react';
 
 const AUTO_CLEAR_ERROR_MS = 5000;
 
@@ -31,29 +31,41 @@ const AuthScreen: React.FC = () => {
       <div className="absolute inset-0 z-0">
         <img
           src="https://images.unsplash.com/photo-1503951914875-452162b0f3f1?q=80&w=2070&auto=format&fit=crop"
-          alt="Barbería Rufianes"
+          alt="Station-OS"
           className="w-full h-full object-cover opacity-25"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-slate-900/40" />
       </div>
 
       {/* Card */}
-      <div className="relative z-10 w-full max-w-md bg-white/5 backdrop-blur-xl border border-white/10 p-8 rounded-3xl shadow-2xl">
+      <div
+          className="relative z-10 w-full max-w-sm p-8 rounded-3xl animate-spring-in"
+          style={{
+              background: 'rgba(15,23,42,0.65)',
+              backdropFilter: 'blur(32px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(32px) saturate(180%)',
+              border: '1px solid rgba(255,255,255,0.10)',
+              boxShadow: '0 32px 80px rgba(0,0,0,0.60), 0 8px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.08)',
+          }}
+      >
         {/* Logo */}
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-400/30 mb-4">
-            <Scissors className="w-8 h-8 text-amber-400" />
+            <Fuel className="w-8 h-8 text-amber-400" />
           </div>
-          <h1 className="text-4xl font-black text-white tracking-tight">Rufianes</h1>
-          <p className="text-amber-400/80 mt-1 text-sm font-semibold uppercase tracking-widest">Barbershop</p>
-          <p className="text-slate-400 mt-3 text-sm">Sistema de gestión para la red de barberías</p>
+          <h1 className="text-4xl font-black text-white tracking-tight">Station-OS</h1>
+          <p className="text-amber-400/80 mt-1 text-sm font-semibold uppercase tracking-widest">Red de Estaciones</p>
+          <p className="text-slate-400 mt-3 text-sm">Inteligencia central para la red de estaciones de servicio</p>
         </div>
 
         <div className="space-y-4">
           <button
             onClick={handleGoogleLogin}
             disabled={isLoading}
-            className="w-full bg-white hover:bg-gray-50 text-gray-900 font-bold py-4 rounded-2xl shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-3 group"
+            className="w-full bg-white hover:bg-gray-50 text-gray-900 font-bold py-4 rounded-2xl
+                       transition-all duration-150 active:scale-[0.97]
+                       flex items-center justify-center gap-3 group"
+            style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.30), 0 2px 4px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.90)' }}
           >
             {isLoading ? (
               <Loader2 className="w-5 h-5 animate-spin text-amber-500" />
@@ -79,13 +91,13 @@ const AuthScreen: React.FC = () => {
           )}
 
           <p className="text-center text-slate-500 text-xs">
-            Acceso exclusivo para administradores y barberos registrados.
+            Acceso exclusivo para administradores y operadores registrados.
           </p>
         </div>
       </div>
 
       <p className="absolute bottom-6 text-slate-600 text-xs text-center w-full z-10">
-        &copy; {new Date().getFullYear()} Rufianes Barbershop
+        &copy; {new Date().getFullYear()} Station-OS
       </p>
     </div>
   );

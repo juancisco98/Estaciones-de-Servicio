@@ -1,6 +1,7 @@
 import * as path from 'path';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(({ mode }) => {
@@ -12,21 +13,22 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
     },
     plugins: [
+      tailwindcss(),
       react(),
       VitePWA({
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
         manifest: {
-          name: 'Rufianes Barbershop',
-          short_name: 'Rufianes',
-          description: 'Sistema de gestión para barberías Rufianes',
+          name: 'Station-OS',
+          short_name: 'Station-OS',
+          description: 'Inteligencia central para red de estaciones de servicio',
           theme_color: '#f59e0b',
-          background_color: '#ffffff',
+          background_color: '#020617',
           display: 'standalone',
           orientation: 'portrait',
           start_url: '/',
           scope: '/',
-          categories: ['business', 'lifestyle'],
+          categories: ['business', 'productivity'],
           icons: [
             {
               src: 'pwa-192x192.svg',
@@ -37,19 +39,11 @@ export default defineConfig(({ mode }) => {
               src: 'pwa-512x512.svg',
               sizes: '512x512',
               type: 'image/svg+xml'
-            },
-            {
-              src: 'logo-rufianes.png',
-              sizes: '512x512',
-              type: 'image/png'
-            },
-            {
-              src: 'logo-rufianes.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'maskable'
             }
           ]
+        },
+        devOptions: {
+          enabled: false,
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,json}'],

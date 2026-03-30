@@ -1,301 +1,248 @@
 import React, { useMemo } from 'react';
-import { Activity, Scissors, DollarSign, TrendingUp, Receipt, MapPin, Clock, Banknote, CreditCard, ArrowLeftRight } from 'lucide-react';
-import { Barbershop, Barber, HaircutSession, ShiftClosing } from '../types';
-import { PAYMENT_METHOD_LABELS } from '../constants';
-
-interface DailySummary { cuts: number; revenue: number; activeBarbers: number; }
+import { Activity, AlertTriangle, Fuel, DollarSign, Gauge, TrendingUp, MapPin } from 'lucide-react';
+import { Station, Alert, DailyClosing, StationMetrics } from '../types';
+import { CLOSING_STATUS_COLORS, CLOSING_STATUS_LABELS } from '../constants';
 
 interface LiveDashboardViewProps {
-  barbershops: Barbershop[];
-  barbers: Barber[];
-  sessions: HaircutSession[];
-  shiftClosings: ShiftClosing[];
-  getDailySummary: (barbershopId: string) => DailySummary;
-  onViewOnMap: (shop: Barbershop) => void;
+    stations: Station[];
+    alerts: Alert[];
+    dailyClosings: DailyClosing[];
+    getStationMetrics: (stationId: string, dateFrom: string, dateTo: string) => StationMetrics;
+    onViewOnMap: (station: Station) => void;
 }
 
-const fmt = (n: number) => `$${n.toLocaleString('es-AR')}`;
+const today = new Date().toISOString().slice(0, 10);
 
-const PaymentIcon: React.FC<{ method: string }> = ({ method }) => {
-  if (method === 'CASH') return <Banknote className="w-3.5 h-3.5 text-emerald-500" />;
-  if (method === 'CARD') return <CreditCard className="w-3.5 h-3.5 text-blue-500" />;
-  return <ArrowLeftRight className="w-3.5 h-3.5 text-violet-500" />;
+const KpiCard: React.FC<{ label: string; value: string | number; sub?: string; icon: React.ReactNode; colorClass: string; glowColor?: string }> = ({
+    label, value, sub, icon, colorClass, glowColor,
+}) => (
+    <div
+        className="bg-white dark:bg-slate-900 rounded-2xl p-4 flex items-start gap-3.5 lift cursor-default
+                   border border-white/80 dark:border-white/8
+                   transition-all duration-200"
+        style={{
+            boxShadow: '0 0 0 1px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.80)',
+        }}
+    >
+        <div
+            className={`p-2.5 rounded-xl shrink-0 ${colorClass}`}
+            style={glowColor ? { boxShadow: `0 4px 12px ${glowColor}` } : {}}
+        >
+            {icon}
+        </div>
+        <div>
+            <p className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">{label}</p>
+            <p className="text-xl font-black text-gray-900 dark:text-white leading-tight mt-0.5">{value}</p>
+            {sub && <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">{sub}</p>}
+        </div>
+    </div>
+);
+
+const StationRow: React.FC<{
+    station: Station;
+    metrics: StationMetrics;
+    alertCount: number;
+    closingStatus?: string;
+    onViewOnMap: (s: Station) => void;
+}> = ({ station, metrics, alertCount, closingStatus, onViewOnMap }) => {
+    const dotClass =
+        metrics.alertLevel === 'CRITICAL' ? 'bg-red-500 animate-pulse' :
+        metrics.alertLevel === 'WARNING'  ? 'bg-orange-500' :
+        metrics.alertLevel === 'INFO'     ? 'bg-blue-500' :
+        'bg-emerald-500';
+
+    const badgeClass =
+        metrics.alertLevel === 'CRITICAL' ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400' :
+        metrics.alertLevel === 'WARNING'  ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400' :
+        'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400';
+
+    const statusColor = closingStatus ? (CLOSING_STATUS_COLORS[closingStatus] ?? 'gray') : null;
+
+    return (
+        <div className="flex items-center gap-4 px-4 py-3 hover:bg-amber-50/40 dark:hover:bg-white/[0.03] transition-all duration-150 border-b border-gray-50/80 dark:border-white/5 last:border-0 group">
+            <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotClass}`} />
+
+            <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{station.name}</p>
+                <p className="text-xs text-gray-400 dark:text-slate-500 truncate">{station.stationCode ?? station.address}</p>
+            </div>
+
+            <div className="text-right hidden sm:block w-28">
+                <p className="text-sm font-bold text-gray-900 dark:text-white">
+                    ${metrics.totalRevenue.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                </p>
+                <p className="text-xs text-gray-400 dark:text-slate-500">{metrics.totalTransactions} tx</p>
+            </div>
+
+            <div className="text-right hidden md:block w-28">
+                <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">
+                    {metrics.fuelLiters.toLocaleString('es-AR', { maximumFractionDigits: 0 })} L
+                </p>
+                <p className="text-xs text-gray-400 dark:text-slate-500">
+                    Stock: {metrics.currentStockLiters.toLocaleString('es-AR', { maximumFractionDigits: 0 })} L
+                </p>
+            </div>
+
+            {statusColor && (
+                <span className={`hidden lg:inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full bg-${statusColor}-100 dark:bg-${statusColor}-500/20 text-${statusColor}-700 dark:text-${statusColor}-400`}>
+                    {CLOSING_STATUS_LABELS[closingStatus!] ?? closingStatus}
+                </span>
+            )}
+
+            {alertCount > 0 && (
+                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${badgeClass}`}>
+                    {alertCount}
+                </span>
+            )}
+
+            <button
+                onClick={() => onViewOnMap(station)}
+                className="p-1.5 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-500/10 text-gray-400 hover:text-amber-500 transition-colors"
+                title="Ver en mapa"
+            >
+                <MapPin className="w-4 h-4" />
+            </button>
+        </div>
+    );
 };
 
 const LiveDashboardView: React.FC<LiveDashboardViewProps> = ({
-  barbershops, barbers, sessions, shiftClosings, getDailySummary, onViewOnMap,
+    stations,
+    alerts,
+    dailyClosings,
+    getStationMetrics,
+    onViewOnMap,
 }) => {
-  const today = new Date().toISOString().slice(0, 10);
+    const activeStations = stations.filter(s => s.isActive);
 
-  const todaySessions = useMemo(() =>
-    sessions.filter(s => s.startedAt.slice(0, 10) === today)
-      .sort((a, b) => b.startedAt.localeCompare(a.startedAt)),
-    [sessions, today]
-  );
+    const metricsMap = useMemo(() => {
+        const map = new Map<string, StationMetrics>();
+        for (const s of activeStations) {
+            map.set(s.id, getStationMetrics(s.id, today, today));
+        }
+        return map;
+    }, [activeStations, getStationMetrics]);
 
-  const todayClosings = useMemo(() =>
-    shiftClosings.filter(c => c.shiftDate === today),
-    [shiftClosings, today]
-  );
+    const unresolvedAlerts  = alerts.filter(a => !a.resolved);
+    const criticalAlerts    = unresolvedAlerts.filter(a => a.level === 'CRITICAL');
+    const totalRevenue      = Array.from(metricsMap.values()).reduce((s, m) => s + m.totalRevenue, 0);
+    const totalFuelLiters   = Array.from(metricsMap.values()).reduce((s, m) => s + m.fuelLiters, 0);
+    const totalTransactions = Array.from(metricsMap.values()).reduce((s, m) => s + m.totalTransactions, 0);
+    const discrepancies     = dailyClosings.filter(c => c.status === 'DISCREPANCY').length;
 
-  const globalStats = useMemo(() => ({
-    cuts: todaySessions.length,
-    revenue: todaySessions.reduce((s, x) => s + x.price, 0),
-    commission: todaySessions.reduce((s, x) => s + x.commissionAmt, 0),
-    expenses: todayClosings.reduce((s, c) => s + c.expensesCash, 0),
-    cash: todaySessions.filter(s => s.paymentMethod === 'CASH').reduce((s, x) => s + x.price, 0),
-    card: todaySessions.filter(s => s.paymentMethod === 'CARD').reduce((s, x) => s + x.price, 0),
-    transfer: todaySessions.filter(s => s.paymentMethod === 'TRANSFER').reduce((s, x) => s + x.price, 0),
-  }), [todaySessions, todayClosings]);
+    const sortedStations = useMemo(() => [...activeStations].sort((a, b) => {
+        const ma = metricsMap.get(a.id);
+        const mb = metricsMap.get(b.id);
+        const levelOrder = (l: string | null | undefined) =>
+            l === 'CRITICAL' ? 0 : l === 'WARNING' ? 1 : l === 'INFO' ? 2 : 3;
+        const diff = levelOrder(ma?.alertLevel) - levelOrder(mb?.alertLevel);
+        if (diff !== 0) return diff;
+        return (mb?.totalRevenue ?? 0) - (ma?.totalRevenue ?? 0);
+    }), [activeStations, metricsMap]);
 
-  const activeShops = barbershops.filter(b => b.isActive);
+    const latestClosings = useMemo(() => {
+        const map = new Map<string, string>();
+        for (const c of dailyClosings) {
+            const ex = map.get(c.stationId);
+            if (!ex || c.shiftDate > ex) map.set(c.stationId, c.status);
+        }
+        return map;
+    }, [dailyClosings]);
 
-  return (
-    <div className="flex flex-col h-full bg-gray-50 dark:bg-slate-950 overflow-y-auto">
+    const alertCountByStation = useMemo(() => {
+        const map = new Map<string, number>();
+        for (const a of unresolvedAlerts) {
+            if (a.stationId) map.set(a.stationId, (map.get(a.stationId) ?? 0) + 1);
+        }
+        return map;
+    }, [unresolvedAlerts]);
 
-      {/* Header */}
-      <div className="p-5 border-b border-gray-100 dark:border-white/10 bg-white dark:bg-slate-900 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center">
-            <Activity className="w-5 h-5 text-amber-500" />
-          </div>
-          <div>
-            <h1 className="text-xl font-black text-gray-900 dark:text-white">En Vivo</h1>
-            <p className="text-xs text-gray-400 dark:text-slate-500 font-medium">
-              {new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })} · actualización en tiempo real
-            </p>
-          </div>
-          {/* Indicador live */}
-          <div className="ml-auto flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">LIVE</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="p-5 space-y-5">
-
-        {/* Stats globales hoy */}
-        <div>
-          <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-3">Red Rufianes — Hoy</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-amber-50 dark:bg-amber-500/10 rounded-2xl p-4">
-              <Scissors className="w-5 h-5 text-amber-500 mb-2" />
-              <p className="text-2xl font-black text-amber-700 dark:text-amber-400">{globalStats.cuts}</p>
-              <p className="text-xs text-amber-600 font-semibold mt-0.5">Cortes hoy</p>
-            </div>
-            <div className="bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl p-4">
-              <DollarSign className="w-5 h-5 text-emerald-500 mb-2" />
-              <p className="text-2xl font-black text-emerald-700 dark:text-emerald-400">
-                {globalStats.revenue >= 1000 ? `$${(globalStats.revenue / 1000).toFixed(1)}k` : fmt(globalStats.revenue)}
-              </p>
-              <p className="text-xs text-emerald-600 font-semibold mt-0.5">Revenue</p>
-            </div>
-            <div className="bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl p-4">
-              <TrendingUp className="w-5 h-5 text-indigo-500 mb-2" />
-              <p className="text-2xl font-black text-indigo-700 dark:text-indigo-400">
-                {globalStats.commission >= 1000 ? `$${(globalStats.commission / 1000).toFixed(1)}k` : fmt(globalStats.commission)}
-              </p>
-              <p className="text-xs text-indigo-600 font-semibold mt-0.5">Comisiones</p>
-            </div>
-            <div className="bg-red-50 dark:bg-red-500/10 rounded-2xl p-4">
-              <Receipt className="w-5 h-5 text-red-500 mb-2" />
-              <p className="text-2xl font-black text-red-700 dark:text-red-400">{fmt(globalStats.expenses)}</p>
-              <p className="text-xs text-red-600 font-semibold mt-0.5">Gastos</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Desglose por método de pago */}
-        {globalStats.cuts > 0 && (
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-gray-100 dark:border-white/10">
-            <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-3">Método de pago</p>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="text-center">
-                <p className="text-base font-black text-emerald-600 dark:text-emerald-400">{fmt(globalStats.cash)}</p>
-                <p className="text-xs text-emerald-600 font-medium mt-0.5">Efectivo</p>
-              </div>
-              <div className="text-center">
-                <p className="text-base font-black text-blue-600 dark:text-blue-400">{fmt(globalStats.card)}</p>
-                <p className="text-xs text-blue-600 font-medium mt-0.5">Tarjeta</p>
-              </div>
-              <div className="text-center">
-                <p className="text-base font-black text-violet-600 dark:text-violet-400">{fmt(globalStats.transfer)}</p>
-                <p className="text-xs text-violet-600 font-medium mt-0.5">Transferencia</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Grid de barberías */}
-        <div>
-          <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-3">Estado por barbería</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-            {activeShops.map(shop => {
-              const summary = getDailySummary(shop.id);
-              const openShift = todayClosings.find(c => c.barbershopId === shop.id && c.status === 'OPEN');
-              const closedShifts = todayClosings.filter(c => c.barbershopId === shop.id && c.status === 'CLOSED');
-              const shopBarbers = barbers.filter(b => b.barbershopId === shop.id && b.isActive);
-
-              const shiftBadge = openShift
-                ? { label: 'Turno abierto', cls: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400' }
-                : closedShifts.length > 0
-                  ? { label: `${closedShifts.length} turno${closedShifts.length > 1 ? 's' : ''} cerrado${closedShifts.length > 1 ? 's' : ''}`, cls: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400' }
-                  : { label: 'Sin turno hoy', cls: 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400' };
-
-              return (
-                <div
-                  key={shop.id}
-                  className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-gray-100 dark:border-white/10 hover:border-amber-200 dark:hover:border-amber-500/30 transition-all"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-black text-gray-900 dark:text-white truncate">{shop.name}</p>
-                      {shop.neighborhood && (
-                        <div className="flex items-center gap-1 mt-0.5">
-                          <MapPin className="w-3 h-3 text-gray-400" />
-                          <p className="text-xs text-gray-400 dark:text-slate-500">{shop.neighborhood}</p>
-                        </div>
-                      )}
+    return (
+        <div className="h-full flex flex-col bg-slate-50/80 dark:bg-slate-950 overflow-hidden">
+            {/* KPI header */}
+            <div className="shrink-0 p-4 pb-3">
+                <div className="flex items-center gap-2 mb-4">
+                    <div className="w-7 h-7 bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl flex items-center justify-center shadow-sm shadow-amber-400/30">
+                        <Activity className="w-3.5 h-3.5 text-white" />
                     </div>
-                    <span className={`ml-2 shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${shiftBadge.cls}`}>
-                      {shiftBadge.label}
+                    <h1 className="text-lg font-black text-gray-900 dark:text-white">En Vivo — Hoy</h1>
+                    <span className="text-[10px] font-bold text-gray-400 dark:text-slate-500 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-full border border-gray-100 dark:border-white/10">
+                        {today}
                     </span>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 mb-3">
-                    <div className="text-center">
-                      <p className="text-lg font-black text-gray-900 dark:text-white">{summary.cuts}</p>
-                      <p className="text-[10px] text-gray-400 font-medium">cortes</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-lg font-black text-emerald-600 dark:text-emerald-400">
-                        {summary.revenue >= 1000 ? `$${(summary.revenue / 1000).toFixed(1)}k` : fmt(summary.revenue)}
-                      </p>
-                      <p className="text-[10px] text-gray-400 font-medium">revenue</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-lg font-black text-gray-700 dark:text-slate-300">{summary.activeBarbers}</p>
-                      <p className="text-[10px] text-gray-400 font-medium">barberos</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex -space-x-1">
-                      {shopBarbers.slice(0, 4).map(b => (
-                        <div
-                          key={b.id}
-                          title={b.name}
-                          className="w-6 h-6 rounded-full bg-amber-500 border-2 border-white dark:border-slate-900 flex items-center justify-center text-[9px] font-black text-white"
-                        >
-                          {b.name.charAt(0).toUpperCase()}
-                        </div>
-                      ))}
-                      {shopBarbers.length > 4 && (
-                        <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-slate-700 border-2 border-white dark:border-slate-900 flex items-center justify-center text-[9px] font-bold text-gray-500">
-                          +{shopBarbers.length - 4}
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => onViewOnMap(shop)}
-                      className="text-xs text-amber-600 dark:text-amber-400 font-semibold hover:underline"
-                    >
-                      Ver en mapa →
-                    </button>
-                  </div>
                 </div>
-              );
-            })}
-          </div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <KpiCard
+                        label="Ventas del día"
+                        value={`$${(totalRevenue / 1000).toFixed(0)}K`}
+                        sub={`${totalTransactions} transacciones`}
+                        icon={<DollarSign className="w-4.5 h-4.5 text-emerald-600 dark:text-emerald-400" />}
+                        colorClass="bg-emerald-100 dark:bg-emerald-500/20"
+                        glowColor="rgba(16,185,129,0.15)"
+                    />
+                    <KpiCard
+                        label="Combustible"
+                        value={`${(totalFuelLiters / 1000).toFixed(1)}K L`}
+                        sub="litros despachados"
+                        icon={<Fuel className="w-4.5 h-4.5 text-amber-600 dark:text-amber-400" />}
+                        colorClass="bg-amber-100 dark:bg-amber-500/20"
+                        glowColor="rgba(245,158,11,0.15)"
+                    />
+                    <KpiCard
+                        label="Alertas activas"
+                        value={unresolvedAlerts.length}
+                        sub={criticalAlerts.length > 0 ? `${criticalAlerts.length} críticas` : 'Sin críticas'}
+                        icon={<AlertTriangle className={`w-4.5 h-4.5 ${criticalAlerts.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400'}`} />}
+                        colorClass={criticalAlerts.length > 0 ? 'bg-red-100 dark:bg-red-500/20' : 'bg-orange-100 dark:bg-orange-500/20'}
+                        glowColor={criticalAlerts.length > 0 ? 'rgba(239,68,68,0.15)' : 'rgba(249,115,22,0.12)'}
+                    />
+                    <KpiCard
+                        label="Estaciones activas"
+                        value={activeStations.length}
+                        sub={discrepancies > 0 ? `${discrepancies} discrepancias` : 'Conciliación OK'}
+                        icon={<Gauge className={`w-4.5 h-4.5 ${discrepancies > 0 ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`} />}
+                        colorClass={discrepancies > 0 ? 'bg-red-100 dark:bg-red-500/20' : 'bg-blue-100 dark:bg-blue-500/20'}
+                        glowColor={discrepancies > 0 ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.12)'}
+                    />
+                </div>
+            </div>
+
+            {/* Station table */}
+            <div className="flex-1 overflow-y-auto px-4 pb-4">
+                <div
+                    className="bg-white dark:bg-slate-900 rounded-2xl overflow-hidden
+                               border border-white/80 dark:border-white/8"
+                    style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.80)' }}
+                >
+                    <div className="flex items-center gap-4 px-4 py-2.5 border-b border-gray-100/80 dark:border-white/8 bg-gray-50/80 dark:bg-white/[0.03]">
+                        <div className="w-2.5 shrink-0" />
+                        <div className="flex-1 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Estación</div>
+                        <div className="hidden sm:block w-28 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider text-right">Ventas hoy</div>
+                        <div className="hidden md:block w-28 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider text-right">Combustible</div>
+                        <div className="hidden lg:block w-24 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider text-right">Cierre</div>
+                        <div className="w-16" />
+                    </div>
+
+                    {sortedStations.length === 0 ? (
+                        <div className="py-16 text-center">
+                            <TrendingUp className="w-12 h-12 mx-auto text-gray-300 dark:text-slate-700 mb-3" />
+                            <p className="text-gray-400 dark:text-slate-500 font-medium">Sin estaciones activas</p>
+                        </div>
+                    ) : (
+                        sortedStations.map(station => (
+                            <StationRow
+                                key={station.id}
+                                station={station}
+                                metrics={metricsMap.get(station.id)!}
+                                alertCount={alertCountByStation.get(station.id) ?? 0}
+                                closingStatus={latestClosings.get(station.id)}
+                                onViewOnMap={onViewOnMap}
+                            />
+                        ))
+                    )}
+                </div>
+            </div>
         </div>
-
-        {/* Turnos activos ahora */}
-        {todayClosings.filter(c => c.status === 'OPEN').length > 0 && (
-          <div>
-            <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-3">Turnos activos ahora</p>
-            <div className="space-y-2">
-              {todayClosings.filter(c => c.status === 'OPEN').map(shift => {
-                const barber = barbers.find(b => b.id === shift.barberId);
-                const shop = barbershops.find(s => s.id === shift.barbershopId);
-                const shiftSessions = todaySessions.filter(s => s.barberId === shift.barberId);
-                const shiftRevenue = shiftSessions.reduce((sum, s) => sum + s.price, 0);
-                const startTime = shift.startedAt
-                  ? new Date(shift.startedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
-                  : '—';
-
-                return (
-                  <div key={shift.id} className="bg-amber-50 dark:bg-amber-500/10 rounded-xl px-4 py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center text-xs font-black text-white">
-                        {barber?.name.charAt(0).toUpperCase() ?? '?'}
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-gray-900 dark:text-white">{barber?.name ?? 'Barbero'}</p>
-                        <p className="text-xs text-gray-500 dark:text-slate-400">{shop?.name ?? 'Barbería'}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-amber-600 dark:text-amber-400">{shiftSessions.length} cortes · {fmt(shiftRevenue)}</p>
-                      <div className="flex items-center justify-end gap-1 text-xs text-gray-400">
-                        <Clock className="w-3 h-3" />
-                        <span>desde {startTime}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Feed de sesiones en vivo */}
-        <div>
-          <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-3">
-            Últimas sesiones{todaySessions.length > 0 && ` (${todaySessions.length} hoy)`}
-          </p>
-          {todaySessions.length === 0 ? (
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-8 text-center border border-gray-100 dark:border-white/10">
-              <Scissors className="w-8 h-8 mx-auto mb-2 text-gray-300 dark:text-slate-600" />
-              <p className="text-sm text-gray-400 dark:text-slate-500 font-medium">Sin actividad por ahora</p>
-              <p className="text-xs text-gray-300 dark:text-slate-600 mt-1">Los cortes aparecerán aquí en tiempo real</p>
-            </div>
-          ) : (
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-white/10 overflow-hidden">
-              {todaySessions.slice(0, 20).map((session, idx) => {
-                const barber = barbers.find(b => b.id === session.barberId);
-                const shop = barbershops.find(s => s.id === session.barbershopId);
-                const time = new Date(session.startedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-
-                return (
-                  <div
-                    key={session.id}
-                    className={`flex items-center gap-3 px-4 py-3 ${idx < todaySessions.slice(0, 20).length - 1 ? 'border-b border-gray-50 dark:border-white/5' : ''}`}
-                  >
-                    <span className="text-xs text-gray-400 dark:text-slate-500 font-mono w-10 shrink-0">{time}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-semibold text-gray-900 dark:text-white truncate">{session.serviceName}</span>
-                        {session.clientName && (
-                          <span className="text-xs text-gray-400 dark:text-slate-500 truncate">· {session.clientName}</span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-400 dark:text-slate-500 truncate">{barber?.name ?? '—'} · {shop?.name ?? '—'}</p>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <PaymentIcon method={session.paymentMethod} />
-                      <span className="text-sm font-bold text-gray-900 dark:text-white">{fmt(session.price)}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-      </div>
-    </div>
-  );
+    );
 };
 
 export default LiveDashboardView;

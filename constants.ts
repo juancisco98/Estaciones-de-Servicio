@@ -1,63 +1,117 @@
-// Google Auth Allowlist — Admins (dueños de Rufianes)
+// ─────────────────────────────────────────────────────────────────
+// Station-OS — Application constants
+// ─────────────────────────────────────────────────────────────────
+
+// Google Auth Allowlist — Admins (network owners)
 export const ALLOWED_EMAILS = [
   'juan.sada98@gmail.com',
 ];
 
-// Buenos Aires Center — todas las barberías están en CABA/GBA
+// Map center — Argentina (adjust once real station locations are loaded)
 export const MAP_CENTER: [number, number] = [-34.6037, -58.3816];
-export const MAP_ZOOM_DEFAULT = 13;
+export const MAP_ZOOM_DEFAULT = 10;   // wider view for 60-station network coverage
+export const MAP_RESIZE_DELAY_MS = 200;
 
+// Date/locale helpers
 export const MONTH_NAMES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 
 export const DAY_NAMES = [
-  'Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'
+  'Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado',
 ];
 
-// Catálogo de servicios por defecto (se puede personalizar por barbería)
-export const DEFAULT_SERVICES = [
-  { name: 'Corte clásico', basePrice: 3500, durationMins: 30 },
-  { name: 'Fade', basePrice: 4500, durationMins: 40 },
-  { name: 'Corte + Barba', basePrice: 5500, durationMins: 50 },
-  { name: 'Barba', basePrice: 2500, durationMins: 20 },
-  { name: 'Degradado', basePrice: 4000, durationMins: 35 },
-  { name: 'Corte Niño', basePrice: 2800, durationMins: 25 },
-  { name: 'Alisado', basePrice: 6000, durationMins: 60 },
-  { name: 'Tintura', basePrice: 5000, durationMins: 45 },
-] as const;
-
-// Métodos de pago
-export const PAYMENT_METHODS = ['CASH', 'CARD', 'TRANSFER'] as const;
+// Payment methods (matches DB enum + edge_agent mapping)
+export const PAYMENT_METHODS = ['CASH', 'CARD', 'ACCOUNT', 'MODO', 'MERCADOPAGO'] as const;
 export type PaymentMethodType = typeof PAYMENT_METHODS[number];
 
 export const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  CASH: 'Efectivo',
-  CARD: 'Tarjeta',
-  TRANSFER: 'Transferencia',
+  CASH:       'Efectivo',
+  CARD:       'Tarjeta',
+  ACCOUNT:    'Cuenta Corriente',
+  MODO:       'MODO QR',
+  MERCADOPAGO: 'Mercado Pago',
 };
 
-// Comisión por defecto para barberos (%)
-export const DEFAULT_COMMISSION_PCT = 50;
+export const PAYMENT_METHOD_COLORS: Record<string, string> = {
+  CASH:       'emerald',
+  CARD:       'blue',
+  ACCOUNT:    'violet',
+  MODO:       'cyan',
+  MERCADOPAGO: 'sky',
+};
 
-// Mapa
-export const MAP_RESIZE_DELAY_MS = 200;
+// Alert levels
+export const ALERT_LEVELS = ['CRITICAL', 'WARNING', 'INFO'] as const;
+export type AlertLevelType = typeof ALERT_LEVELS[number];
 
-// Analytics — ventana de carga de sesiones (días hacia atrás)
-export const SESSIONS_LOAD_DAYS = 90;
+export const ALERT_LEVEL_LABELS: Record<string, string> = {
+  CRITICAL: 'Crítica',
+  WARNING:  'Advertencia',
+  INFO:     'Informativa',
+};
 
-// Horario de recordatorio para cierre de turno (hora del día, formato 24h)
-export const SHIFT_CLOSE_REMINDER_HOUR = 20;
+export const ALERT_LEVEL_COLORS: Record<string, string> = {
+  CRITICAL: 'red',
+  WARNING:  'orange',
+  INFO:     'blue',
+};
 
-// Especialidades disponibles para barberos
-export const BARBER_SPECIALTIES = [
-  'Fade',
-  'Clásico',
-  'Barba',
-  'Degradado',
-  'Tintura',
-  'Alisado',
-  'Diseño',
-  'Niños',
-] as const;
+// Closing status
+export const CLOSING_STATUS_LABELS: Record<string, string> = {
+  PENDING:     'Pendiente',
+  RECONCILED:  'Conciliado',
+  DISCREPANCY: 'Discrepancia',
+};
+
+export const CLOSING_STATUS_COLORS: Record<string, string> = {
+  PENDING:     'amber',
+  RECONCILED:  'green',
+  DISCREPANCY: 'red',
+};
+
+// Product types (from station_knowledge)
+export const PRODUCT_TYPE_LABELS: Record<string, string> = {
+  FUEL:       'Combustible',
+  LUBRICANT:  'Lubricante',
+  SHOP_ITEM:  'Tienda',
+  SERVICE:    'Servicio',
+};
+
+export const PRODUCT_TYPE_COLORS: Record<string, string> = {
+  FUEL:      'amber',
+  LUBRICANT: 'teal',
+  SHOP_ITEM: 'violet',
+  SERVICE:   'blue',
+};
+
+// Employee roles
+export const EMPLOYEE_ROLE_LABELS: Record<string, string> = {
+  MANAGER:   'Encargado',
+  ATTENDANT: 'Playero',
+  CASHIER:   'Cajero',
+};
+
+// Tank IDs
+export const TANK_IDS = ['TQ1', 'TQ2', 'TQ3', 'TQ4', 'TQ5'] as const;
+export type TankIdType = typeof TANK_IDS[number];
+
+// Tank alert thresholds (liters) — also stored in station_knowledge per station
+export const TANK_WARNING_LITERS  = 800;
+export const TANK_CRITICAL_LITERS = 300;
+
+// Reconciliation tolerance (0.1% = 0.001)
+export const RECONCILIATION_TOLERANCE = 0.001;
+
+// Analytics — load window (days back)
+export const TRANSACTIONS_LOAD_DAYS = 90;
+
+// Real-time channel names
+export const RT_CHANNELS = {
+  SALES:        'sales_transactions_realtime',
+  TANKS:        'tank_levels_realtime',
+  CLOSINGS:     'daily_closings_realtime',
+  ALERTS:       'alerts_realtime',
+  NOTIFICATIONS:'notifications_realtime',
+} as const;

@@ -45,3 +45,18 @@ supabase/.temp/
 # Lint artifacts
 lint_output.txt
 lint_results.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.venv/
+venv/
+
+# Edge Agent runtime (local state — never commit)
+edge_agent/logs/
+edge_agent/dead_letter/
+edge_agent/state.json

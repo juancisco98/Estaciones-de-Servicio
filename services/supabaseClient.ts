@@ -55,7 +55,7 @@ export const signInWithGoogle = async () => {
 
     // Determine the redirect URL based on platform
     const isNative = Capacitor.isNativePlatform();
-    const redirectToUrl = isNative ? 'com.rufianes.app://login-callback' : window.location.origin;
+    const redirectToUrl = isNative ? 'com.stationos.app://login-callback' : window.location.origin;
 
     const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',

@@ -1,0 +1,371 @@
+"""
+Station-OS Edge Agent — Watcher
+Main entry point. Monitors D:\\SVAPP\\<station_code>\\ for new/modified .TXT files
+and orchestrates the parse → upload pipeline.
+
+Usage:
+    python edge_agent/watcher.py [--config path/to/config.yaml]
+
+Architecture:
+    watchdog FileSystemEventHandler
+        ↓ (on_created / on_modified event for *.TXT)
+    _debounce_queue (deduplication + 2s delay for VB write completion)
+        ↓
+    _process_file(file_path, station_id)
+        ↓
+    MD5 check against state.json (idempotency — skip if unchanged)
+        ↓
+    _route_to_parser(file_path) → BaseParser subclass
+        ↓
+    parser.parse() → ParseResult
+        ↓
+    uploader.upload_parse_result(result)
+        ↓
+    state.json updated with MD5 + timestamp + records_inserted
+
+File routing by prefix (case-insensitive):
+    VE*.TXT → VEParser → sales_transactions
+    C*.TXT  → CParser  → card_payments
+    T*.TXT  → TParser  → tank_levels
+    P*.TXT  → PParser  → daily_closings (forecourt_total)
+    S*.TXT  → SParser  → daily_closings (shop_total)
+
+Non-destructive guarantee:
+    The watcher ONLY reads from D:\\SVAPP. It NEVER writes to that directory.
+    state.json lives in edge_agent/ (this directory), not in D:\\SVAPP.
+
+Windows Service:
+    To run as a Windows service, use:
+        python edge_agent/watcher.py --install-service
+    (requires pywin32)
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import logging
+import logging.handlers
+import os
+import sys
+import time
+from pathlib import Path
+from threading import Event, Lock, Timer
+from typing import Any
+
+import yaml
+from dotenv import load_dotenv
+from watchdog.events import FileSystemEventHandler, FileSystemEvent
+from watchdog.observers import Observer
+
+from .parsers import FILE_PREFIX_MAP, BaseParser
+from .uploader import SupabaseUploader
+
+
+# ─── Constants ───────────────────────────────────────────────────────────────
+
+_AGENT_DIR = Path(__file__).parent
+_STATE_FILE = _AGENT_DIR / "state.json"
+_DEFAULT_CONFIG = _AGENT_DIR / "config.yaml"
+
+logger = logging.getLogger("station_os.watcher")
+
+
+# ─── State management (idempotency) ──────────────────────────────────────────
+
+class StateManager:
+    """
+    Thread-safe manager for state.json.
+    Tracks MD5 hashes of processed files to prevent duplicate uploads.
+    """
+
+    def __init__(self, state_file: Path = _STATE_FILE):
+        self._path = state_file
+        self._lock = Lock()
+        self._state: dict[str, Any] = self._load()
+
+    def _load(self) -> dict:
+        if self._path.exists():
+            try:
+                data = json.loads(self._path.read_text(encoding="utf-8"))
+                return data.get("processed_files", {})
+            except (json.JSONDecodeError, OSError):
+                return {}
+        return {}
+
+    def _save(self) -> None:
+        tmp = {
+            "_comment": "Station-OS state file. Tracks processed files by MD5.",
+            "_schema_version": 1,
+            "processed_files": self._state,
+        }
+        self._path.write_text(json.dumps(tmp, indent=2), encoding="utf-8")
+
+    def is_processed(self, file_path: str, md5: str) -> bool:
+        with self._lock:
+            entry = self._state.get(file_path)
+            return entry is not None and entry.get("md5") == md5
+
+    def mark_processed(
+        self,
+        file_path: str,
+        md5: str,
+        records_inserted: int,
+        errors: list[str],
+    ) -> None:
+        from datetime import datetime
+        with self._lock:
+            self._state[file_path] = {
+                "md5":              md5,
+                "processed_at":     datetime.utcnow().isoformat() + "Z",
+                "records_inserted": records_inserted,
+                "error_count":      len(errors),
+            }
+            self._save()
+
+
+def _md5(file_path: str) -> str:
+    """Compute MD5 of a file in chunks. Never modifies the file."""
+    h = hashlib.md5()
+    with open(file_path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+# ─── File routing ─────────────────────────────────────────────────────────────
+
+def _get_parser(file_path: str, station_id: str) -> BaseParser | None:
+    """
+    Route a .TXT file to the correct parser by filename prefix.
+    Returns None if the file type is not recognized.
+    """
+    name = os.path.basename(file_path).upper()
+    for prefix, parser_class in FILE_PREFIX_MAP.items():
+        if name.startswith(prefix):
+            return parser_class(station_id=station_id, file_path=file_path)
+    return None
+
+
+# ─── Core processing ──────────────────────────────────────────────────────────
+
+def process_file(
+    file_path: str,
+    station_id: str,
+    state: StateManager,
+    uploader: SupabaseUploader,
+) -> None:
+    """
+    Full pipeline for a single .TXT file:
+      1. Compute MD5 (non-destructive read)
+      2. Skip if already processed with same MD5 (idempotency)
+      3. Route to parser
+      4. Parse
+      5. Log any parse errors
+      6. Upload to Supabase
+      7. Update state.json
+    """
+    try:
+        file_md5 = _md5(file_path)
+    except OSError as exc:
+        logger.error("Cannot read %s: %s", file_path, exc)
+        return
+
+    if state.is_processed(file_path, file_md5):
+        logger.debug("Skipping %s (already processed, MD5=%s)", file_path, file_md5[:8])
+        return
+
+    parser = _get_parser(file_path, station_id)
+    if parser is None:
+        logger.debug("No parser for %s — skipping", os.path.basename(file_path))
+        return
+
+    logger.info("Processing %s (station=%s)", os.path.basename(file_path), station_id[:8])
+
+    try:
+        result = parser.parse()
+    except Exception as exc:
+        logger.error("Parser crashed on %s: %s", file_path, exc, exc_info=True)
+        state.mark_processed(file_path, file_md5, 0, [str(exc)])
+        return
+
+    # Log parse errors (anomalies, corrupt lines) — do not abort upload
+    if result.errors:
+        for err in result.errors:
+            logger.warning("[%s] %s", result.file_name, err)
+
+    # Upload (retries handled internally by uploader)
+    success = uploader.upload_parse_result(result)
+
+    state.mark_processed(
+        file_path=file_path,
+        md5=file_md5,
+        records_inserted=result.lines_ok if success else 0,
+        errors=result.errors,
+    )
+
+    if success:
+        logger.info(
+            "✓ %s: %d/%d lines → Supabase (%d errors)",
+            result.file_name, result.lines_ok, result.lines_parsed, len(result.errors),
+        )
+    else:
+        logger.error("✗ %s: upload failed — written to dead letter queue", result.file_name)
+
+
+# ─── Watchdog event handler ───────────────────────────────────────────────────
+
+class TxtFileHandler(FileSystemEventHandler):
+    """
+    Handles filesystem events for a single station directory.
+    Debounces events so that VB files written in multiple chunks are fully
+    written before processing begins.
+    """
+
+    def __init__(
+        self,
+        station_id: str,
+        state: StateManager,
+        uploader: SupabaseUploader,
+        debounce_seconds: float = 2.0,
+    ):
+        self.station_id = station_id
+        self.state = state
+        self.uploader = uploader
+        self.debounce_seconds = debounce_seconds
+        self._pending: dict[str, Timer] = {}
+        self._lock = Lock()
+
+    def _is_txt(self, path: str) -> bool:
+        return path.upper().endswith(".TXT")
+
+    def _schedule(self, file_path: str) -> None:
+        """Debounce: cancel any pending timer for this file and restart."""
+        with self._lock:
+            existing = self._pending.pop(file_path, None)
+            if existing:
+                existing.cancel()
+            timer = Timer(
+                self.debounce_seconds,
+                process_file,
+                args=(file_path, self.station_id, self.state, self.uploader),
+            )
+            self._pending[file_path] = timer
+            timer.start()
+
+    def on_created(self, event: FileSystemEvent) -> None:
+        if not event.is_directory and self._is_txt(event.src_path):
+            logger.debug("FILE CREATED: %s", event.src_path)
+            self._schedule(event.src_path)
+
+    def on_modified(self, event: FileSystemEvent) -> None:
+        if not event.is_directory and self._is_txt(event.src_path):
+            logger.debug("FILE MODIFIED: %s", event.src_path)
+            self._schedule(event.src_path)
+
+
+# ─── Bootstrap ───────────────────────────────────────────────────────────────
+
+def _setup_logging(config: dict) -> None:
+    log_cfg = config.get("logging", {})
+    level_name = log_cfg.get("level", "INFO")
+    level = getattr(logging, level_name, logging.INFO)
+    log_file = log_cfg.get("log_file", "logs/edge_agent.log")
+    max_bytes = log_cfg.get("max_bytes", 10_485_760)
+    backup_count = log_cfg.get("backup_count", 5)
+
+    Path(log_file).parent.mkdir(parents=True, exist_ok=True)
+
+    formatter = logging.Formatter(
+        "%(asctime)s %(levelname)-8s %(name)s — %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
+    )
+
+    handlers: list[logging.Handler] = [
+        logging.StreamHandler(sys.stdout),
+        logging.handlers.RotatingFileHandler(
+            log_file, maxBytes=max_bytes, backupCount=backup_count, encoding="utf-8"
+        ),
+    ]
+    for h in handlers:
+        h.setFormatter(formatter)
+    logging.basicConfig(level=level, handlers=handlers)
+
+
+def _load_config(config_path: Path) -> dict:
+    with open(config_path, encoding="utf-8") as fh:
+        return yaml.safe_load(fh)
+
+
+def main(config_path: Path = _DEFAULT_CONFIG, stop_event: Event | None = None) -> None:
+    load_dotenv()
+
+    config = _load_config(config_path)
+    _setup_logging(config)
+
+    logger.info("Station-OS Edge Agent starting...")
+
+    # Supabase credentials
+    supabase_url = config["supabase"]["url"]
+    service_key_env = config["supabase"]["service_key_env"]
+    service_key = os.environ.get(service_key_env, "")
+    if not service_key:
+        logger.critical("Missing Supabase service key (env var: %s)", service_key_env)
+        sys.exit(1)
+
+    watch_root = Path(config["watcher"]["watch_path"])
+    station_mappings: dict[str, str] = config.get("stations", {})
+    debounce = config["watcher"].get("debounce_seconds", 2.0)
+
+    if not watch_root.exists():
+        logger.critical("Watch path does not exist: %s", watch_root)
+        sys.exit(1)
+
+    if not station_mappings:
+        logger.critical("No stations configured in config.yaml")
+        sys.exit(1)
+
+    state = StateManager()
+    uploader = SupabaseUploader(supabase_url, service_key, config)
+    observer = Observer()
+
+    for station_code, station_id in station_mappings.items():
+        station_dir = watch_root / station_code
+        if not station_dir.exists():
+            logger.warning("Station directory not found: %s — watching anyway", station_dir)
+            station_dir.mkdir(parents=True, exist_ok=True)
+
+        handler = TxtFileHandler(
+            station_id=station_id,
+            state=state,
+            uploader=uploader,
+            debounce_seconds=debounce,
+        )
+        observer.schedule(handler, str(station_dir), recursive=False)
+        logger.info("Watching %s → station_id=%s", station_dir, station_id[:8])
+
+    observer.start()
+    logger.info("Watching %d stations under %s", len(station_mappings), watch_root)
+    logger.info("Press Ctrl+C to stop.")
+
+    try:
+        while stop_event is None or not stop_event.is_set():
+            time.sleep(1)
+    except KeyboardInterrupt:
+        logger.info("Shutdown requested...")
+    finally:
+        observer.stop()
+        observer.join()
+        logger.info("Station-OS Edge Agent stopped.")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Station-OS Edge Agent")
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=_DEFAULT_CONFIG,
+        help="Path to config.yaml",
+    )
+    args = parser.parse_args()
+    main(config_path=args.config)

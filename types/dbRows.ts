@@ -1,100 +1,153 @@
 /**
- * RUFIANES — Database row types matching Supabase snake_case schema.
- * Used in mapper functions (dbTo* / *ToDb).
+ * Station-OS — Database row types (snake_case).
+ * Mirrors: supabase/migrations/20260401_station_os_schema.sql
+ * Used exclusively in mapper functions (dbTo* / *ToDb).
  */
 
-export interface DbBarbershopRow {
+export interface DbStationRow {
   id: string;
   name: string;
   address: string;
   coordinates: [number, number];
-  neighborhood?: string | null;
+  city?: string | null;
+  province?: string | null;
   phone?: string | null;
-  image_url?: string | null;
-  is_active: boolean;
   manager_name?: string | null;
+  is_active: boolean;
+  station_code?: string | null;
+  watch_path?: string | null;
   notes?: string | null;
-  chair_count?: number | null;
-  opening_hours?: Record<string, { open: string; close: string; is_open: boolean }> | null;
   created_at?: string;
   updated_at?: string;
 }
 
-export interface DbBarberRow {
+export interface DbEmployeeRow {
   id: string;
-  barbershop_id: string;
+  station_id: string;
   name: string;
-  phone?: string | null;
   email?: string | null;
-  photo_url?: string | null;
-  specialties: string[];
-  commission_pct: number | string;
+  role: string;           // 'MANAGER' | 'ATTENDANT' | 'CASHIER'
   is_active: boolean;
   hire_date?: string | null;
   notes?: string | null;
   created_at?: string;
+}
+
+export interface DbOperatorAuthRow {
+  user_id: string;
+  employee_id: string;
+  station_id: string;
+  created_at?: string;
+}
+
+export interface DbSalesTransactionRow {
+  id: string;
+  station_id: string;
+  file_name: string;
+  transaction_ts: string;
+  product_code: string;
+  product_name: string;
+  quantity: number | string;
+  unit_price: number | string;
+  total_amount: number | string;
+  payment_method?: string | null;
+  shift_date: string;
+  daily_closing_id?: string | null;
+  raw_line?: string | null;
+  ingested_at?: string;
+}
+
+export interface DbCardPaymentRow {
+  id: string;
+  station_id: string;
+  file_name: string;
+  payment_ts?: string | null;
+  payment_type: string;
+  account_name?: string | null;
+  amount: number | string;
+  reference_code?: string | null;
+  shift_date?: string | null;
+  daily_closing_id?: string | null;
+  raw_line?: string | null;
+  ingested_at?: string;
+}
+
+export interface DbTankLevelRow {
+  id: string;
+  station_id: string;
+  file_name: string;
+  recorded_at: string;
+  shift_date?: string | null;
+  tank_id: string;         // 'TQ1' | 'TQ2' | 'TQ3' | 'TQ4' | 'TQ5'
+  product_code: string;
+  product_name: string;
+  level_liters: number | string;
+  capacity_liters?: number | string | null;
+  raw_line?: string | null;
+  ingested_at?: string;
+}
+
+export interface DbDailyClosingRow {
+  id: string;
+  station_id: string;
+  shift_date: string;
+  forecourt_total?: number | string | null;
+  shop_total?: number | string | null;
+  transactions_total?: number | string | null;
+  reconciliation_diff?: number | string | null;
+  reconciliation_ok: boolean;
+  p_file_name?: string | null;
+  s_file_name?: string | null;
+  status: string;         // 'PENDING' | 'RECONCILED' | 'DISCREPANCY'
+  notes?: string | null;
+  created_at?: string;
   updated_at?: string;
 }
 
-export interface DbServiceRow {
+export interface DbAlertRow {
   id: string;
-  barbershop_id?: string | null;
-  name: string;
-  description?: string | null;
-  base_price: number | string;
-  duration_mins: number;
-  is_active: boolean;
-  created_at?: string;
+  station_id?: string | null;
+  level: string;          // 'CRITICAL' | 'WARNING' | 'INFO'
+  type: string;
+  title: string;
+  message: string;
+  related_date?: string | null;
+  related_file?: string | null;
+  resolved: boolean;
+  resolved_at?: string | null;
+  resolved_by?: string | null;
+  metadata?: Record<string, unknown> | null;
+  created_at: string;
 }
 
-export interface DbClientRow {
+export interface DbStationKnowledgeRow {
   id: string;
-  barbershop_id?: string | null;
-  name: string;
-  phone?: string | null;
-  notes?: string | null;
-  created_at?: string;
-}
-
-export interface DbHaircutSessionRow {
-  id: string;
-  barbershop_id: string;
-  barber_id: string;
-  client_id?: string | null;
-  client_name?: string | null;
-  service_id?: string | null;
-  service_name: string;
-  price: number | string;
-  commission_pct: number | string;
-  commission_amt: number | string;
-  payment_method: string;
-  started_at: string;
-  ended_at?: string | null;
-  duration_mins?: number | null;
-  shift_closing_id?: string | null;
-  notes?: string | null;
-  created_at?: string;
-}
-
-export interface DbShiftClosingRow {
-  id: string;
-  barbershop_id: string;
-  barber_id: string;
-  shift_date: string;
-  started_at?: string | null;
-  closed_at: string | null;
-  total_cuts: number;
-  total_cash: number | string;
-  total_card: number | string;
-  total_transfer: number | string;
-  total_revenue: number | string;
-  total_commission: number | string;
-  expenses_cash: number | string;
-  expenses_detail: { description: string; amount: number }[];
-  net_cash_to_hand?: number | string | null;
-  notes?: string | null;
-  status: string;
-  created_at?: string;
+  station_id: string;
+  knowledge_blob: {
+    schema_version: number;
+    products: Record<string, {
+      canonical_name: string;
+      product_type: string;
+      aliases: string[];
+      occurrence_count?: number;
+    }>;
+    payment_accounts: Record<string, {
+      canonical_name: string;
+      account_type: string;
+      aliases: string[];
+      occurrence_count?: number;
+    }>;
+    anomaly_baselines: {
+      daily_fuel_liters_p50: number;
+      cash_variance_tolerance_pct: number;
+      min_tank_alert_liters: number;
+      critical_tank_liters: number;
+    };
+    unknown_product_codes: string[];
+    unknown_account_names: string[];
+  };
+  version: number;
+  last_updated: string;
 }
 
 export interface DbNotificationRow {
@@ -107,10 +160,4 @@ export interface DbNotificationRow {
   read: boolean;
   created_at: string;
   metadata?: Record<string, unknown> | null;
-}
-
-export interface DbBarberAuthRow {
-  user_id: string;
-  barber_id: string;
-  created_at?: string;
 }
