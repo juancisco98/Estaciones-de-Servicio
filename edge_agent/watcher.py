@@ -314,38 +314,32 @@ def main(config_path: Path = _DEFAULT_CONFIG, stop_event: Event | None = None) -
         sys.exit(1)
 
     watch_root = Path(config["watcher"]["watch_path"])
-    station_mappings: dict[str, str] = config.get("stations", {})
+    station_id: str = config.get("station_id", "")
     debounce = config["watcher"].get("debounce_seconds", 2.0)
 
     if not watch_root.exists():
         logger.critical("Watch path does not exist: %s", watch_root)
         sys.exit(1)
 
-    if not station_mappings:
-        logger.critical("No stations configured in config.yaml")
+    if not station_id:
+        logger.critical("No station_id configured in config.yaml")
         sys.exit(1)
 
     state = StateManager()
     uploader = SupabaseUploader(supabase_url, service_key, config)
     observer = Observer()
 
-    for station_code, station_id in station_mappings.items():
-        station_dir = watch_root / station_code
-        if not station_dir.exists():
-            logger.warning("Station directory not found: %s — watching anyway", station_dir)
-            station_dir.mkdir(parents=True, exist_ok=True)
-
-        handler = TxtFileHandler(
-            station_id=station_id,
-            state=state,
-            uploader=uploader,
-            debounce_seconds=debounce,
-        )
-        observer.schedule(handler, str(station_dir), recursive=False)
-        logger.info("Watching %s → station_id=%s", station_dir, station_id[:8])
+    handler = TxtFileHandler(
+        station_id=station_id,
+        state=state,
+        uploader=uploader,
+        debounce_seconds=debounce,
+    )
+    observer.schedule(handler, str(watch_root), recursive=False)
+    logger.info("Watching %s → station_id=%s", watch_root, station_id[:8])
 
     observer.start()
-    logger.info("Watching %d stations under %s", len(station_mappings), watch_root)
+    logger.info("Watching %s for station %s", watch_root, station_id[:8])
     logger.info("Press Ctrl+C to stop.")
 
     try:

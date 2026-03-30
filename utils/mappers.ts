@@ -58,6 +58,7 @@ export const dbToStation = (row: DbStationRow): Station => ({
   phone:       row.phone ?? undefined,
   managerName: row.manager_name ?? undefined,
   isActive:    row.is_active,
+  ownerEmail:  row.owner_email ?? undefined,
   stationCode: row.station_code ?? undefined,
   watchPath:   row.watch_path ?? undefined,
   notes:       row.notes ?? undefined,
@@ -78,6 +79,7 @@ export const stationToDb = (station: Station): Record<string, unknown> => {
     is_active:   station.isActive,
     notes:       station.notes ?? null,
   };
+  if (station.ownerEmail  !== undefined) payload.owner_email  = station.ownerEmail;
   if (station.stationCode !== undefined) payload.station_code = station.stationCode;
   if (station.watchPath   !== undefined) payload.watch_path   = station.watchPath;
   return payload;

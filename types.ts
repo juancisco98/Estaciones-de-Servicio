@@ -25,8 +25,9 @@ export interface Station {
   phone?: string;
   managerName?: string;
   isActive: boolean;
-  stationCode?: string;  // e.g. "EST_001" — matches D:\SVAPP subfolder
-  watchPath?: string;    // e.g. "D:\SVAPP\EST_001"
+  ownerEmail?: string;   // tenant key — owner's email
+  stationCode?: string;  // e.g. "EST_001"
+  watchPath?: string;    // e.g. "C:\SVAPP"
   notes?: string;
   createdAt?: string;
   updatedAt?: string;

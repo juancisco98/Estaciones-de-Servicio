@@ -14,6 +14,7 @@ export interface DbStationRow {
   phone?: string | null;
   manager_name?: string | null;
   is_active: boolean;
+  owner_email?: string | null;
   station_code?: string | null;
   watch_path?: string | null;
   notes?: string | null;
