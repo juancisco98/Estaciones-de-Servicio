@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { Station } from '../types';
 import { useDataContext } from '../context/DataContext';
 import { stationToDb } from '../utils/mappers';
-import { supabaseUpsert, supabaseDelete } from '../utils/supabaseHelpers';
+import { supabaseUpsert, supabaseUpdate } from '../utils/supabaseHelpers';
 import { generateUUID } from '../utils/generateUUID';
 
 export const useStations = () => {
@@ -44,7 +44,7 @@ export const useStations = () => {
             const current = stations.find(s => s.id === id);
             if (!current) return false;
             const newActive = !current.isActive;
-            await supabaseUpsert('stations', { id, is_active: newActive }, 'estación');
+            await supabaseUpdate('stations', id, { is_active: newActive }, 'estación');
             setStations(prev => prev.map(s => s.id === id ? { ...s, isActive: newActive } : s));
             toast.success(newActive ? 'Estación activada' : 'Estación desactivada');
             return true;
