@@ -7,22 +7,16 @@
 -- ─── EXTENSIONS ──────────────────────────────────────────────────────────────
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- ─── ENUM TYPES ──────────────────────────────────────────────────────────────
-CREATE TYPE employee_role       AS ENUM ('MANAGER', 'ATTENDANT', 'CASHIER');
-CREATE TYPE payment_method_type AS ENUM ('CASH', 'CARD', 'ACCOUNT', 'MODO', 'MERCADOPAGO');
-CREATE TYPE closing_status      AS ENUM ('PENDING', 'RECONCILED', 'DISCREPANCY');
-CREATE TYPE alert_level         AS ENUM ('CRITICAL', 'WARNING', 'INFO');
-CREATE TYPE alert_type          AS ENUM (
-    'CASH_DISCREPANCY',
-    'NEGATIVE_VALUE',
-    'MISSING_FILE',
-    'LOW_TANK_LEVEL',
-    'CRITICAL_TANK_LEVEL',
-    'RECONCILIATION_FAIL',
-    'UNKNOWN_PRODUCT',
-    'VOLUME_ANOMALY',
-    'MISSING_TRANSACTIONS'
-);
+-- ─── ENUM TYPES (idempotent) ─────────────────────────────────────────────────
+DO $$ BEGIN CREATE TYPE employee_role       AS ENUM ('MANAGER', 'ATTENDANT', 'CASHIER');           EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE payment_method_type AS ENUM ('CASH', 'CARD', 'ACCOUNT', 'MODO', 'MERCADOPAGO'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE closing_status      AS ENUM ('PENDING', 'RECONCILED', 'DISCREPANCY');      EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE alert_level         AS ENUM ('CRITICAL', 'WARNING', 'INFO');               EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE alert_type          AS ENUM (
+    'CASH_DISCREPANCY', 'NEGATIVE_VALUE', 'MISSING_FILE', 'LOW_TANK_LEVEL',
+    'CRITICAL_TANK_LEVEL', 'RECONCILIATION_FAIL', 'UNKNOWN_PRODUCT',
+    'VOLUME_ANOMALY', 'MISSING_TRANSACTIONS'
+); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ─── TABLE: allowed_emails ───────────────────────────────────────────────────
 -- Whitelist del dueño/administradores. Solo los emails aquí pueden entrar.
@@ -64,8 +58,8 @@ CREATE TABLE IF NOT EXISTS stations (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_stations_active ON stations(is_active);
-CREATE INDEX idx_stations_code   ON stations(station_code);
+CREATE INDEX IF NOT EXISTS idx_stations_active ON stations(is_active);
+CREATE INDEX IF NOT EXISTS idx_stations_code   ON stations(station_code);
 
 -- ─── TABLE: employees ────────────────────────────────────────────────────────
 -- Personal de cada estación (solo para referencia — no tienen login).
@@ -81,8 +75,8 @@ CREATE TABLE IF NOT EXISTS employees (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_employees_station ON employees(station_id);
-CREATE INDEX idx_employees_email   ON employees(LOWER(email));
+CREATE INDEX IF NOT EXISTS idx_employees_station ON employees(station_id);
+CREATE INDEX IF NOT EXISTS idx_employees_email   ON employees(LOWER(email));
 
 -- ─── TABLE: daily_closings ───────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS daily_closings (
@@ -103,8 +97,8 @@ CREATE TABLE IF NOT EXISTS daily_closings (
     UNIQUE (station_id, shift_date)
 );
 
-CREATE INDEX idx_daily_closings_station_date ON daily_closings(station_id, shift_date DESC);
-CREATE INDEX idx_daily_closings_status       ON daily_closings(status);
+CREATE INDEX IF NOT EXISTS idx_daily_closings_station_date ON daily_closings(station_id, shift_date DESC);
+CREATE INDEX IF NOT EXISTS idx_daily_closings_status       ON daily_closings(status);
 
 -- ─── TABLE: sales_transactions ───────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS sales_transactions (
@@ -124,10 +118,10 @@ CREATE TABLE IF NOT EXISTS sales_transactions (
     ingested_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_sales_station_date ON sales_transactions(station_id, shift_date DESC);
-CREATE INDEX idx_sales_product_code ON sales_transactions(product_code);
-CREATE INDEX idx_sales_file_name    ON sales_transactions(file_name);
-CREATE INDEX idx_sales_closing      ON sales_transactions(daily_closing_id);
+CREATE INDEX IF NOT EXISTS idx_sales_station_date ON sales_transactions(station_id, shift_date DESC);
+CREATE INDEX IF NOT EXISTS idx_sales_product_code ON sales_transactions(product_code);
+CREATE INDEX IF NOT EXISTS idx_sales_file_name    ON sales_transactions(file_name);
+CREATE INDEX IF NOT EXISTS idx_sales_closing      ON sales_transactions(daily_closing_id);
 
 -- ─── TABLE: card_payments ────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS card_payments (
@@ -145,8 +139,8 @@ CREATE TABLE IF NOT EXISTS card_payments (
     ingested_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_card_payments_station_date ON card_payments(station_id, shift_date DESC);
-CREATE INDEX idx_card_payments_type         ON card_payments(payment_type);
+CREATE INDEX IF NOT EXISTS idx_card_payments_station_date ON card_payments(station_id, shift_date DESC);
+CREATE INDEX IF NOT EXISTS idx_card_payments_type         ON card_payments(payment_type);
 
 -- ─── TABLE: tank_levels ──────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS tank_levels (
@@ -163,8 +157,8 @@ CREATE TABLE IF NOT EXISTS tank_levels (
     ingested_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_tank_levels_station_time ON tank_levels(station_id, recorded_at DESC);
-CREATE INDEX idx_tank_levels_tank_id      ON tank_levels(station_id, tank_id);
+CREATE INDEX IF NOT EXISTS idx_tank_levels_station_time ON tank_levels(station_id, recorded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tank_levels_tank_id      ON tank_levels(station_id, tank_id);
 
 -- ─── TABLE: alerts ───────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS alerts (
@@ -183,8 +177,8 @@ CREATE TABLE IF NOT EXISTS alerts (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_alerts_station_unresolved ON alerts(station_id, resolved, created_at DESC);
-CREATE INDEX idx_alerts_level_unresolved   ON alerts(level, resolved);
+CREATE INDEX IF NOT EXISTS idx_alerts_station_unresolved ON alerts(station_id, resolved, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_alerts_level_unresolved   ON alerts(level, resolved);
 
 -- ─── TABLE: station_knowledge ────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS station_knowledge (
@@ -248,6 +242,20 @@ AS $$
 $$;
 
 -- ── Policies: solo el dueño (admin) tiene acceso completo ────────────────────
+-- (idempotent: drop first if exists, then create)
+
+DO $$ BEGIN
+    DROP POLICY IF EXISTS "Admin full access" ON allowed_emails;
+    DROP POLICY IF EXISTS "Admin full access" ON notifications;
+    DROP POLICY IF EXISTS "Admin full access" ON stations;
+    DROP POLICY IF EXISTS "Admin full access" ON employees;
+    DROP POLICY IF EXISTS "Admin full access" ON sales_transactions;
+    DROP POLICY IF EXISTS "Admin full access" ON card_payments;
+    DROP POLICY IF EXISTS "Admin full access" ON tank_levels;
+    DROP POLICY IF EXISTS "Admin full access" ON daily_closings;
+    DROP POLICY IF EXISTS "Admin full access" ON alerts;
+    DROP POLICY IF EXISTS "Admin full access" ON station_knowledge;
+END $$;
 
 CREATE POLICY "Admin full access" ON allowed_emails     FOR ALL USING (is_admin());
 CREATE POLICY "Admin full access" ON notifications      FOR ALL USING (is_admin());

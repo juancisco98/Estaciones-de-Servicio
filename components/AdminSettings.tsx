@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Plus, X, Loader2, Gauge, ChevronDown, ChevronUp, Power } from 'lucide-react';
+import { Settings, Plus, Gauge, ChevronDown, ChevronUp, Power, AlertTriangle, Loader2 } from 'lucide-react';
 import { Station, Employee, User } from '../types';
 import { EMPLOYEE_ROLE_LABELS } from '../constants';
 import KnowledgePanelSection from './KnowledgePanelSection';
@@ -24,19 +24,23 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
     const [deactivatingId, setDeactivatingId]   = useState<string | null>(null);
     const [isProcessing, setIsProcessing]       = useState(false);
     const [showModal, setShowModal]             = useState(false);
+    const [editingStation, setEditingStation]   = useState<Station | null>(null);
 
     const toggle = (s: NonNullable<Section>) =>
         setExpandedSection(prev => prev === s ? null : s);
 
-    const handleDeactivate = async (id: string) => {
+    const handleDeactivateConfirm = async () => {
+        if (!deactivatingId) return;
         setIsProcessing(true);
         try {
-            await onDeactivateStation(id);
-            setDeactivatingId(null);
+            await onDeactivateStation(deactivatingId);
         } finally {
             setIsProcessing(false);
+            setDeactivatingId(null);
         }
     };
+
+    const deactivatingStation = deactivatingId ? stations.find(s => s.id === deactivatingId) : null;
 
     const activeStations = stations.filter(s => s.isActive);
 
@@ -87,11 +91,11 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
                             )}
                             {stations.map(station => (
                                 <div key={station.id} className="px-6 py-4 flex items-center justify-between">
-                                    <div className="min-w-0">
+                                    <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-2">
                                             <span className={`w-2 h-2 rounded-full shrink-0 ${station.isActive ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-slate-600'}`} />
                                             <p className={`text-sm font-semibold ${station.isActive ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-slate-500'}`}>
-                                                {station.name}
+                                                {station.name || '(Sin nombre)'}
                                             </p>
                                             {station.stationCode && (
                                                 <span className="text-[10px] font-mono text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 px-1.5 py-0.5 rounded">
@@ -99,30 +103,27 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
                                                 </span>
                                             )}
                                         </div>
-                                        <p className="text-xs text-gray-400 dark:text-slate-500 truncate mt-0.5">{station.address}</p>
+                                        <p className="text-xs text-gray-400 dark:text-slate-500 truncate mt-0.5">{station.address || '(Sin dirección)'}</p>
                                     </div>
                                     <div className="flex items-center gap-1 ml-3 shrink-0">
-                                        {deactivatingId === station.id ? (
-                                            <div className="flex items-center gap-1">
-                                                <button
-                                                    onClick={() => handleDeactivate(station.id)}
-                                                    disabled={isProcessing}
-                                                    className="text-xs font-bold text-white bg-red-500 hover:bg-red-600 px-3 py-2 min-h-[44px] rounded-xl transition-colors"
-                                                >
-                                                    {isProcessing ? <Loader2 className="w-3 h-3 animate-spin" /> : station.isActive ? 'Desactivar' : 'Activar'}
-                                                </button>
-                                                <button onClick={() => setDeactivatingId(null)} className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-400 hover:text-gray-600">
-                                                    <X className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <button
-                                                onClick={() => setDeactivatingId(station.id)}
-                                                className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-gray-100 dark:hover:bg-slate-800 rounded-xl text-gray-300 dark:text-slate-600 hover:text-red-400 transition-colors"
-                                            >
-                                                <Power className="w-4 h-4" />
-                                            </button>
-                                        )}
+                                        <button
+                                            onClick={() => setEditingStation(station)}
+                                            className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-gray-100 dark:hover:bg-slate-800 rounded-xl text-gray-300 dark:text-slate-600 hover:text-amber-500 transition-colors"
+                                            title="Editar"
+                                        >
+                                            <Settings className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => setDeactivatingId(station.id)}
+                                            className={`p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-gray-100 dark:hover:bg-slate-800 rounded-xl transition-colors ${
+                                                station.isActive
+                                                    ? 'text-gray-300 dark:text-slate-600 hover:text-red-400'
+                                                    : 'text-gray-300 dark:text-slate-600 hover:text-emerald-400'
+                                            }`}
+                                            title={station.isActive ? 'Desactivar' : 'Activar'}
+                                        >
+                                            <Power className="w-4 h-4" />
+                                        </button>
                                     </div>
                                 </div>
                             ))}
@@ -161,13 +162,84 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
                 </div>
             </div>
 
-            {/* Station Form Modal */}
+            {/* Station Form Modal — Create */}
             {showModal && (
                 <StationFormModal
                     station={null}
                     onSave={onSaveStation}
                     onClose={() => setShowModal(false)}
                 />
+            )}
+
+            {/* Station Form Modal — Edit */}
+            {editingStation && (
+                <StationFormModal
+                    station={editingStation}
+                    onSave={onSaveStation}
+                    onClose={() => setEditingStation(null)}
+                />
+            )}
+
+            {/* Confirmation Modal — Deactivate/Activate */}
+            {deactivatingStation && (
+                <>
+                    <div
+                        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[2000]"
+                        onClick={() => setDeactivatingId(null)}
+                    />
+                    <div className="fixed inset-0 z-[2001] flex items-center justify-center p-4 pointer-events-none">
+                        <div
+                            className="pointer-events-auto w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl overflow-hidden animate-scale-in"
+                            style={{
+                                boxShadow: '0 32px 80px rgba(0,0,0,0.30), 0 8px 24px rgba(0,0,0,0.15)',
+                            }}
+                        >
+                            <div className="p-6 text-center">
+                                <div className={`w-14 h-14 mx-auto mb-4 rounded-2xl flex items-center justify-center ${
+                                    deactivatingStation.isActive
+                                        ? 'bg-red-100 dark:bg-red-500/20'
+                                        : 'bg-emerald-100 dark:bg-emerald-500/20'
+                                }`}>
+                                    <AlertTriangle className={`w-7 h-7 ${
+                                        deactivatingStation.isActive
+                                            ? 'text-red-500'
+                                            : 'text-emerald-500'
+                                    }`} />
+                                </div>
+                                <h3 className="text-lg font-black text-gray-900 dark:text-white mb-2">
+                                    {deactivatingStation.isActive ? '¿Desactivar estación?' : '¿Activar estación?'}
+                                </h3>
+                                <p className="text-sm text-gray-500 dark:text-slate-400">
+                                    {deactivatingStation.isActive
+                                        ? <>La estación <strong className="text-gray-700 dark:text-white">{deactivatingStation.name || '(Sin nombre)'}</strong> dejará de aparecer en el mapa y reportes.</>
+                                        : <>La estación <strong className="text-gray-700 dark:text-white">{deactivatingStation.name || '(Sin nombre)'}</strong> volverá a estar activa.</>
+                                    }
+                                </p>
+                            </div>
+                            <div className="px-6 pb-6 flex gap-3">
+                                <button
+                                    onClick={() => setDeactivatingId(null)}
+                                    className="flex-1 px-4 py-3 min-h-[48px] text-sm font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-white rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleDeactivateConfirm}
+                                    disabled={isProcessing}
+                                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] rounded-xl text-white text-sm font-bold transition-all active:scale-95 disabled:opacity-60 ${
+                                        deactivatingStation.isActive
+                                            ? 'bg-red-500 hover:bg-red-600'
+                                            : 'bg-emerald-500 hover:bg-emerald-600'
+                                    }`}
+                                >
+                                    {isProcessing ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : deactivatingStation.isActive ? 'Sí, desactivar' : 'Sí, activar'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </>
             )}
         </div>
     );

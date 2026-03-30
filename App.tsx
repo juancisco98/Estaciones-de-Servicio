@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, Suspense, lazy, useRef } from 'react';
 import { Toaster } from 'sonner';
+import { Menu } from 'lucide-react';
 import { handleError } from './utils/errorHandler';
 
 import MapBoard from './components/MapBoard';
@@ -247,17 +248,35 @@ const Dashboard: React.FC = () => {
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <main className="flex-1 overflow-hidden relative">
 
-          {/* Header — visible in all views for mobile access to menu/refresh/notifications */}
-          <Header
-            currentUser={currentUser}
-            onMenuClick={() => setIsSidebarOpen(true)}
-            onLogout={handleLogout}
-            onRefresh={refreshData}
-            isLoading={isLoading}
-            onMapSearch={currentView === 'MAP' ? (lat: number, lng: number) => setMapFlyTo([lat, lng]) : undefined}
-            unresolvedAlertCount={unresolvedAlertCount}
-            criticalAlertCount={criticalAlertCount}
-          />
+          {/* Header — only on MAP view */}
+          {currentView === 'MAP' && (
+            <Header
+              currentUser={currentUser}
+              onMenuClick={() => setIsSidebarOpen(true)}
+              onLogout={handleLogout}
+              onRefresh={refreshData}
+              isLoading={isLoading}
+              onMapSearch={(lat: number, lng: number) => setMapFlyTo([lat, lng])}
+              unresolvedAlertCount={unresolvedAlertCount}
+              criticalAlertCount={criticalAlertCount}
+            />
+          )}
+
+          {/* Mobile menu button — non-MAP views (sidebar handles nav on desktop) */}
+          {currentView !== 'MAP' && (
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="lg:hidden absolute top-4 left-4 z-[800] p-2.5 w-11 h-11 flex items-center justify-center
+                         bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl
+                         border border-white/60 dark:border-white/10
+                         rounded-xl text-gray-700 dark:text-white
+                         transition-all active:scale-95"
+              style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}
+              aria-label="Abrir menú"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          )}
 
           {/* MAP */}
           {currentView === 'MAP' && (
