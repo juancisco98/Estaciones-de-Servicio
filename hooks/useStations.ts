@@ -4,6 +4,7 @@ import { Station } from '../types';
 import { useDataContext } from '../context/DataContext';
 import { stationToDb } from '../utils/mappers';
 import { supabaseUpsert, supabaseUpdate } from '../utils/supabaseHelpers';
+import { supabase } from '../services/supabaseClient';
 import { generateUUID } from '../utils/generateUUID';
 
 export const useStations = () => {
@@ -12,6 +13,22 @@ export const useStations = () => {
     const saveStation = useCallback(async (data: Partial<Station> & { name: string; address: string }): Promise<boolean> => {
         try {
             const isNew = !data.id;
+
+            // Get current user email for owner_email (required NOT NULL)
+            let ownerEmail = data.ownerEmail;
+            if (!ownerEmail) {
+                if (!isNew) {
+                    // Editing: preserve existing owner_email
+                    const existing = stations.find(s => s.id === data.id);
+                    ownerEmail = existing?.ownerEmail;
+                }
+                if (!ownerEmail) {
+                    // New station or no existing: use current user's email
+                    const { data: sessionData } = await supabase.auth.getSession();
+                    ownerEmail = sessionData.session?.user?.email ?? undefined;
+                }
+            }
+
             const station: Station = {
                 id:          data.id ?? generateUUID(),
                 name:        data.name,
@@ -22,6 +39,7 @@ export const useStations = () => {
                 phone:       data.phone,
                 managerName: data.managerName,
                 isActive:    data.isActive ?? true,
+                ownerEmail,
                 stationCode: data.stationCode,
                 watchPath:   data.watchPath,
                 notes:       data.notes,
@@ -37,7 +55,7 @@ export const useStations = () => {
         } catch {
             return false;
         }
-    }, [setStations]);
+    }, [stations, setStations]);
 
     const deactivateStation = useCallback(async (id: string): Promise<boolean> => {
         try {
