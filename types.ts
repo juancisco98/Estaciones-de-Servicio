@@ -13,6 +13,13 @@ export interface User {
   role: 'ADMIN';
 }
 
+export interface AllowedEmail {
+  id: string;
+  email: string;
+  isSuperadmin: boolean;
+  createdAt?: string;
+}
+
 // ── STATIONS ──
 
 export interface Station {

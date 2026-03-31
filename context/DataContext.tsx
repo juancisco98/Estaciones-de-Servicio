@@ -9,6 +9,7 @@ import {
     Alert,
     AlertLevel,
     AppNotification,
+    AllowedEmail,
 } from '../types';
 import {
     DbSalesTransactionRow,
@@ -16,6 +17,7 @@ import {
     DbDailyClosingRow,
     DbAlertRow,
     DbNotificationRow,
+    DbAllowedEmailRow,
 } from '../types/dbRows';
 import { supabase } from '../services/supabaseClient';
 import {
@@ -27,6 +29,7 @@ import {
     dbToDailyClosing,
     dbToAlert,
     dbToNotification,
+    dbToAllowedEmail,
 } from '../utils/mappers';
 import { handleError } from '../utils/errorHandler';
 import { TRANSACTIONS_LOAD_DAYS, RT_CHANNELS } from '../constants';
@@ -48,6 +51,8 @@ interface DataContextType {
     setDailyClosings: React.Dispatch<React.SetStateAction<DailyClosing[]>>;
     alerts: Alert[];
     setAlerts: React.Dispatch<React.SetStateAction<Alert[]>>;
+    allowedEmails: AllowedEmail[];
+    setAllowedEmails: React.Dispatch<React.SetStateAction<AllowedEmail[]>>;
     notifications: AppNotification[];
     unreadCount: number;
     unresolvedAlertCount: number;
@@ -70,6 +75,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [dailyClosings, setDailyClosings]         = useState<DailyClosing[]>([]);
     const [alerts, setAlerts]                       = useState<Alert[]>([]);
     const [notifications, setNotifications]         = useState<AppNotification[]>([]);
+    const [allowedEmails, setAllowedEmails]         = useState<AllowedEmail[]>([]);
     const [isLoading, setIsLoading]                 = useState(true);
 
     const unreadCount = notifications.filter(n => !n.read).length;
@@ -158,6 +164,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 if (cpResult.data) setCardPayments(cpResult.data.map(dbToCardPayment));
             } catch {
                 console.warn('[DataContext] card_payments table not available');
+            }
+
+            // allowed_emails: for superadmin owner management
+            try {
+                const aeResult = await supabase.from('allowed_emails').select('*')
+                    .order('created_at', { ascending: true });
+                if (aeResult.data) setAllowedEmails(aeResult.data.map(dbToAllowedEmail));
+            } catch {
+                console.warn('[DataContext] allowed_emails table not available');
             }
 
         } catch (error) {
@@ -312,6 +327,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             tankLevels,           setTankLevels,
             dailyClosings,        setDailyClosings,
             alerts,               setAlerts,
+            allowedEmails,        setAllowedEmails,
             notifications,
             unreadCount,
             unresolvedAlertCount,

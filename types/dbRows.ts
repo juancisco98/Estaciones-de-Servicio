@@ -164,3 +164,10 @@ export interface DbNotificationRow {
   created_at: string;
   metadata?: Record<string, unknown> | null;
 }
+
+export interface DbAllowedEmailRow {
+  id: string;
+  email: string;
+  is_superadmin: boolean;
+  created_at?: string;
+}

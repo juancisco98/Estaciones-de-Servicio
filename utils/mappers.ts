@@ -32,6 +32,7 @@ import {
   KnowledgeAccount,
   ProductType,
   AccountType,
+  AllowedEmail,
 } from '../types';
 
 import {
@@ -44,6 +45,7 @@ import {
   DbAlertRow,
   DbNotificationRow,
   DbStationKnowledgeRow,
+  DbAllowedEmailRow,
 } from '../types/dbRows';
 
 // ─── STATION ─────────────────────────────────────────────────────────────────
@@ -351,3 +353,18 @@ export const dbToStationKnowledge = (row: DbStationKnowledgeRow): StationKnowled
     },
   };
 };
+
+// ─── ALLOWED EMAIL ───────────────────────────────────────────────────────────
+
+export const dbToAllowedEmail = (row: DbAllowedEmailRow): AllowedEmail => ({
+  id:           row.id,
+  email:        row.email,
+  isSuperadmin: row.is_superadmin,
+  createdAt:    row.created_at,
+});
+
+export const allowedEmailToDb = (ae: AllowedEmail): Record<string, unknown> => ({
+  id:            ae.id,
+  email:         ae.email.trim().toLowerCase(),
+  is_superadmin: ae.isSuperadmin,
+});

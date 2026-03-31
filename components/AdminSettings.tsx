@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Settings, Plus, Gauge, ChevronDown, ChevronUp, Power, AlertTriangle, Loader2 } from 'lucide-react';
+import { Settings, Plus, Gauge, ChevronDown, ChevronUp, Power, AlertTriangle, Loader2, Users, Trash2, Building2 } from 'lucide-react';
 import { Station, Employee, User } from '../types';
 import { EMPLOYEE_ROLE_LABELS } from '../constants';
 import KnowledgePanelSection from './KnowledgePanelSection';
 import StationFormModal from './StationFormModal';
+import { useAllowedEmails } from '../hooks/useAllowedEmails';
+import { useStations } from '../hooks/useStations';
 
 interface AdminSettingsProps {
     stations: Station[];
@@ -12,7 +14,7 @@ interface AdminSettingsProps {
     currentUser: User | null;
 }
 
-type Section = 'stations' | null;
+type Section = 'stations' | 'owners' | null;
 
 const AdminSettings: React.FC<AdminSettingsProps> = ({
     stations,
@@ -25,6 +27,18 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
     const [isProcessing, setIsProcessing]       = useState(false);
     const [showModal, setShowModal]             = useState(false);
     const [editingStation, setEditingStation]   = useState<Station | null>(null);
+
+    // Owner management state
+    const [newOwnerEmail, setNewOwnerEmail]     = useState('');
+    const [addingOwner, setAddingOwner]         = useState(false);
+    const [removingOwnerId, setRemovingOwnerId] = useState<string | null>(null);
+    const [assigningOwnerEmail, setAssigningOwnerEmail] = useState<string | null>(null);
+
+    const { allowedEmails, addOwner, removeOwner, getStationCountByOwner, getStationsByOwner, getUnassignedStations } = useAllowedEmails();
+    const { saveStation: updateStationOwner } = useStations();
+
+    // Check if current user is superadmin
+    const isSuperadmin = allowedEmails.some(ae => ae.email === currentUser?.email && ae.isSuperadmin);
 
     const toggle = (s: NonNullable<Section>) =>
         setExpandedSection(prev => prev === s ? null : s);
@@ -131,6 +145,159 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
                     )}
                 </div>
 
+                {/* ── DUEÑOS (solo superadmin) ── */}
+                {isSuperadmin && (
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-white/80 dark:border-white/8 overflow-hidden"
+                        style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.03), 0 4px 12px rgba(0,0,0,0.07), 0 8px 24px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.80)' }}>
+                        <button
+                            onClick={() => toggle('owners')}
+                            className="w-full px-6 py-5 flex items-center justify-between"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 bg-violet-100 dark:bg-violet-500/20 rounded-xl flex items-center justify-center">
+                                    <Users className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+                                </div>
+                                <div className="text-left">
+                                    <p className="font-bold text-sm text-gray-900 dark:text-white">Dueños</p>
+                                    <p className="text-xs text-gray-400 dark:text-slate-500">
+                                        {allowedEmails.filter(ae => !ae.isSuperadmin).length} dueños · {allowedEmails.filter(ae => ae.isSuperadmin).length} superadmin
+                                    </p>
+                                </div>
+                            </div>
+                            {expandedSection === 'owners' ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                        </button>
+
+                        {expandedSection === 'owners' && (
+                            <div className="border-t border-gray-50 dark:border-white/5">
+                                {/* Add owner input */}
+                                <div className="px-6 py-4 flex gap-2">
+                                    <input
+                                        type="email"
+                                        value={newOwnerEmail}
+                                        onChange={e => setNewOwnerEmail(e.target.value)}
+                                        placeholder="email@ejemplo.com"
+                                        className="flex-1 px-4 py-2.5 min-h-[44px] text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+                                        onKeyDown={async e => {
+                                            if (e.key === 'Enter') {
+                                                setAddingOwner(true);
+                                                const ok = await addOwner(newOwnerEmail);
+                                                if (ok) setNewOwnerEmail('');
+                                                setAddingOwner(false);
+                                            }
+                                        }}
+                                    />
+                                    <button
+                                        onClick={async () => {
+                                            setAddingOwner(true);
+                                            const ok = await addOwner(newOwnerEmail);
+                                            if (ok) setNewOwnerEmail('');
+                                            setAddingOwner(false);
+                                        }}
+                                        disabled={addingOwner || !newOwnerEmail.trim()}
+                                        className="px-4 py-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center bg-violet-500 hover:bg-violet-600 disabled:opacity-50 rounded-xl text-white text-sm font-semibold transition-all"
+                                    >
+                                        {addingOwner ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                                    </button>
+                                </div>
+
+                                {/* Owner list */}
+                                <div className="divide-y divide-gray-50 dark:divide-white/5">
+                                    {allowedEmails.length === 0 && (
+                                        <p className="px-6 py-8 text-sm text-gray-400 dark:text-slate-500 text-center">Sin dueños registrados</p>
+                                    )}
+                                    {allowedEmails.map(ae => {
+                                        const stationCount = getStationCountByOwner(ae.email);
+                                        const ownerStations = getStationsByOwner(ae.email);
+                                        return (
+                                            <div key={ae.id} className="px-6 py-4">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{ae.email}</p>
+                                                            {ae.isSuperadmin ? (
+                                                                <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 px-1.5 py-0.5 rounded">
+                                                                    SUPERADMIN
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-[10px] font-bold text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-500/10 px-1.5 py-0.5 rounded">
+                                                                    DUEÑO
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">
+                                                            {stationCount === 0 ? 'Sin estaciones asignadas' : `${stationCount} estación${stationCount > 1 ? 'es' : ''}`}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 ml-3 shrink-0">
+                                                        <button
+                                                            onClick={() => setAssigningOwnerEmail(assigningOwnerEmail === ae.email ? null : ae.email)}
+                                                            className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-gray-100 dark:hover:bg-slate-800 rounded-xl text-gray-300 dark:text-slate-600 hover:text-violet-500 transition-colors"
+                                                            title="Asignar estaciones"
+                                                        >
+                                                            <Building2 className="w-4 h-4" />
+                                                        </button>
+                                                        {!ae.isSuperadmin && (
+                                                            <button
+                                                                onClick={() => setRemovingOwnerId(ae.id)}
+                                                                className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-gray-100 dark:hover:bg-slate-800 rounded-xl text-gray-300 dark:text-slate-600 hover:text-red-400 transition-colors"
+                                                                title="Eliminar dueño"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Assigned stations + assign panel */}
+                                                {assigningOwnerEmail === ae.email && (
+                                                    <div className="mt-3 space-y-2">
+                                                        {ownerStations.length > 0 && (
+                                                            <div className="space-y-1">
+                                                                {ownerStations.map(s => (
+                                                                    <div key={s.id} className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-slate-800 rounded-lg">
+                                                                        <span className="text-xs text-gray-700 dark:text-slate-300">{s.name}</span>
+                                                                        <button
+                                                                            onClick={async () => {
+                                                                                await updateStationOwner({ ...s, ownerEmail: undefined } as any);
+                                                                            }}
+                                                                            className="text-[10px] text-red-400 hover:text-red-500 font-semibold"
+                                                                        >
+                                                                            Quitar
+                                                                        </button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                        {/* Unassigned stations to pick from */}
+                                                        {getUnassignedStations().length > 0 && (
+                                                            <div className="space-y-1">
+                                                                <p className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Sin asignar</p>
+                                                                {getUnassignedStations().map(s => (
+                                                                    <div key={s.id} className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-slate-800/50 rounded-lg">
+                                                                        <span className="text-xs text-gray-500 dark:text-slate-400">{s.name}</span>
+                                                                        <button
+                                                                            onClick={async () => {
+                                                                                await updateStationOwner({ ...s, ownerEmail: ae.email } as any);
+                                                                            }}
+                                                                            className="text-[10px] text-violet-500 hover:text-violet-600 font-semibold"
+                                                                        >
+                                                                            Asignar
+                                                                        </button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* ── CONOCIMIENTO DE ESTACIÓN ── */}
                 {currentUser?.role === 'ADMIN' && (
                     <KnowledgePanelSection stations={stations} isAdmin={true} />
@@ -179,6 +346,56 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
                     onClose={() => setEditingStation(null)}
                 />
             )}
+
+            {/* Confirmation Modal — Remove Owner */}
+            {removingOwnerId && (() => {
+                const ownerToRemove = allowedEmails.find(ae => ae.id === removingOwnerId);
+                if (!ownerToRemove) return null;
+                return (
+                    <>
+                        <div
+                            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[2000]"
+                            onClick={() => setRemovingOwnerId(null)}
+                        />
+                        <div className="fixed inset-0 z-[2001] flex items-center justify-center p-4 pointer-events-none">
+                            <div
+                                className="pointer-events-auto w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl overflow-hidden animate-scale-in"
+                                style={{ boxShadow: '0 32px 80px rgba(0,0,0,0.30), 0 8px 24px rgba(0,0,0,0.15)' }}
+                            >
+                                <div className="p-6 text-center">
+                                    <div className="w-14 h-14 mx-auto mb-4 rounded-2xl flex items-center justify-center bg-red-100 dark:bg-red-500/20">
+                                        <Trash2 className="w-7 h-7 text-red-500" />
+                                    </div>
+                                    <h3 className="text-lg font-black text-gray-900 dark:text-white mb-2">¿Eliminar dueño?</h3>
+                                    <p className="text-sm text-gray-500 dark:text-slate-400">
+                                        Se eliminará a <strong className="text-gray-700 dark:text-white">{ownerToRemove.email}</strong> de la lista de acceso. Ya no podrá iniciar sesión.
+                                    </p>
+                                </div>
+                                <div className="px-6 pb-6 flex gap-3">
+                                    <button
+                                        onClick={() => setRemovingOwnerId(null)}
+                                        className="flex-1 px-4 py-3 min-h-[48px] text-sm font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-white rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={async () => {
+                                            setIsProcessing(true);
+                                            await removeOwner(removingOwnerId);
+                                            setIsProcessing(false);
+                                            setRemovingOwnerId(null);
+                                        }}
+                                        disabled={isProcessing}
+                                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-bold transition-all active:scale-95 disabled:opacity-60"
+                                    >
+                                        {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Sí, eliminar'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                );
+            })()}
 
             {/* Confirmation Modal — Deactivate/Activate */}
             {deactivatingStation && (
