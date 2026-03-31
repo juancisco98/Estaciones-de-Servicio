@@ -2,7 +2,7 @@ import React from 'react';
 import {
     Map as MapIcon, Fuel, ShoppingCart, Droplets,
     AlertTriangle, BarChart3, Settings, LogOut, X, ClipboardCheck,
-    Gauge, Sun, Moon,
+    Gauge, Sun, Moon, CreditCard,
 } from 'lucide-react';
 import { User } from '../types';
 import { useTheme } from '../context/ThemeContext';
@@ -14,6 +14,7 @@ export type ViewState =
     | 'TANKS'
     | 'ALERTS'
     | 'RECONCILIATION'
+    | 'ACCOUNTS'
     | 'ANALYTICS'
     | 'SETTINGS';
 
@@ -71,6 +72,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             badge: discrepancyCount > 0 ? discrepancyCount : undefined,
             badgeVariant: 'red',
         },
+        { id: 'ACCOUNTS',       label: 'Cuentas Ctes.',  icon: CreditCard },
         { id: 'ANALYTICS',      label: 'Analytics',      icon: BarChart3 },
         { id: 'SETTINGS',       label: 'Ajustes',        icon: Settings },
     ];

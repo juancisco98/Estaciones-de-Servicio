@@ -3,6 +3,7 @@ import { Droplets, AlertTriangle, TrendingDown, ChevronDown, ChevronUp } from 'l
 import { Station, User } from '../types';
 import { useTankLevels } from '../hooks/useTankLevels';
 import { TANK_WARNING_LITERS, TANK_CRITICAL_LITERS } from '../constants';
+import StationFilter from './StationFilter';
 
 interface TankLevelsViewProps {
     stations: Station[];
@@ -116,6 +117,20 @@ const StationTankPanel: React.FC<{ station: Station }> = ({ station }) => {
                                         {new Date(tank.recordedAt).toLocaleString('es-AR', { timeStyle: 'short', dateStyle: 'short' })}
                                     </p>
                                 </div>
+                                {(tank.soldLiters != null || tank.soldAmount != null) && (
+                                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200 dark:border-slate-700">
+                                        {tank.soldLiters != null && (
+                                            <p className="text-xs text-amber-600 dark:text-amber-400 font-semibold">
+                                                Vendidos: {tank.soldLiters.toLocaleString('es-AR', { maximumFractionDigits: 0 })} L
+                                            </p>
+                                        )}
+                                        {tank.soldAmount != null && tank.soldAmount > 0 && (
+                                            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
+                                                ${tank.soldAmount.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         );
                     })}
@@ -127,17 +142,21 @@ const StationTankPanel: React.FC<{ station: Station }> = ({ station }) => {
 
 const TankLevelsView: React.FC<TankLevelsViewProps> = ({ stations, currentUser }) => {
     const { getLowTanks, getCriticalTanks } = useTankLevels();
+    const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
+
+    const activeStations = useMemo(() => {
+        const active = stations.filter(s => s.isActive);
+        return selectedStationId ? active.filter(s => s.id === selectedStationId) : active;
+    }, [stations, selectedStationId]);
 
     const { lowCount, criticalCount } = useMemo(() => {
         let low = 0, critical = 0;
-        for (const s of stations) {
+        for (const s of activeStations) {
             low      += getLowTanks(s.id).length;
             critical += getCriticalTanks(s.id).length;
         }
         return { lowCount: low, criticalCount: critical };
-    }, [stations, getLowTanks, getCriticalTanks]);
-
-    const activeStations = stations.filter(s => s.isActive);
+    }, [activeStations, getLowTanks, getCriticalTanks]);
 
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
@@ -148,6 +167,12 @@ const TankLevelsView: React.FC<TankLevelsViewProps> = ({ stations, currentUser }
                     <h1 className="text-2xl font-black text-gray-900 dark:text-white">Niveles de Tanques</h1>
                 </div>
                 <div className="flex items-center gap-4 flex-wrap">
+                    <StationFilter
+                        stations={stations}
+                        selectedStationId={selectedStationId}
+                        onChange={setSelectedStationId}
+                        className="min-w-[200px]"
+                    />
                     <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-slate-400">
                         <span className="w-2 h-2 rounded-full bg-red-500" />
                         Crítico ({"<"}{TANK_CRITICAL_LITERS} L):

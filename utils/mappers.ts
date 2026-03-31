@@ -189,6 +189,8 @@ export const dbToTankLevel = (row: DbTankLevelRow): TankLevel => ({
   productName:    row.product_name,
   levelLiters:    Number(row.level_liters),
   capacityLiters: row.capacity_liters != null ? Number(row.capacity_liters) : undefined,
+  soldLiters:     row.sold_liters != null ? Number(row.sold_liters) : undefined,
+  soldAmount:     row.sold_amount != null ? Number(row.sold_amount) : undefined,
   rawLine:        row.raw_line ?? undefined,
   ingestedAt:     row.ingested_at,
 });
@@ -204,6 +206,8 @@ export const tankLevelToDb = (tl: TankLevel): Record<string, unknown> => ({
   product_name:    tl.productName,
   level_liters:    tl.levelLiters,
   capacity_liters: tl.capacityLiters ?? null,
+  sold_liters:     tl.soldLiters ?? null,
+  sold_amount:     tl.soldAmount ?? null,
   raw_line:        tl.rawLine ?? null,
 });
 

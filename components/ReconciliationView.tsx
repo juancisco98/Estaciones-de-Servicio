@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { ClipboardCheck, Search, AlertTriangle, CheckCircle, Clock, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react';
 import { Station, DailyClosing, Alert, User, ClosingStatus } from '../types';
 import { CLOSING_STATUS_LABELS, CLOSING_STATUS_COLORS } from '../constants';
+import StationFilter from './StationFilter';
 
 interface ReconciliationViewProps {
     stations: Station[];
@@ -170,11 +171,13 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({
     const [filterStatus, setFilterStatus] = useState<ClosingStatus | 'ALL'>('ALL');
     const [dateFrom, setDateFrom]   = useState(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
     const [dateTo, setDateTo]       = useState(new Date().toISOString().slice(0, 10));
+    const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
 
     const stationMap = useMemo(() => new Map(stations.map(s => [s.id, s.name])), [stations]);
 
     const filtered = useMemo(() => {
         let list = dailyClosings;
+        if (selectedStationId) list = list.filter(c => c.stationId === selectedStationId);
         if (filterStatus !== 'ALL') list = list.filter(c => c.status === filterStatus);
         list = list.filter(c => c.shiftDate >= dateFrom && c.shiftDate <= dateTo);
         if (search.trim()) {
@@ -190,7 +193,7 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({
             if (diff !== 0) return diff;
             return b.shiftDate.localeCompare(a.shiftDate);
         });
-    }, [dailyClosings, filterStatus, dateFrom, dateTo, search, stationMap]);
+    }, [dailyClosings, selectedStationId, filterStatus, dateFrom, dateTo, search, stationMap]);
 
     const discrepancies = dailyClosings.filter(c => c.status === 'DISCREPANCY').length;
     const pending       = dailyClosings.filter(c => c.status === 'PENDING').length;
@@ -221,6 +224,12 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
+                    <StationFilter
+                        stations={stations}
+                        selectedStationId={selectedStationId}
+                        onChange={setSelectedStationId}
+                        className="min-w-[200px]"
+                    />
                     <div className="flex items-center gap-1.5">
                         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
                             className="text-sm rounded-xl bg-gray-100 dark:bg-slate-800 border border-transparent text-gray-800 dark:text-white px-4 py-2.5 min-h-[44px] focus:outline-none focus:border-amber-400"

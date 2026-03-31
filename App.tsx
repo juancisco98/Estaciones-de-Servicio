@@ -32,11 +32,12 @@ const SalesHistoryView   = lazy(() => import('./components/SalesHistoryView'));
 const TankLevelsView     = lazy(() => import('./components/TankLevelsView'));
 const AlertsView         = lazy(() => import('./components/AlertsView'));
 const ReconciliationView = lazy(() => import('./components/ReconciliationView'));
+const CardPaymentsView   = lazy(() => import('./components/CardPaymentsView'));
 const AnalyticsDashboard = lazy(() => import('./components/AnalyticsDashboard'));
 const AdminSettings      = lazy(() => import('./components/AdminSettings'));
 const StationCard        = lazy(() => import('./components/StationCard'));
 
-const VALID_VIEWS: ViewState[] = ['MAP', 'STATIONS', 'SALES', 'TANKS', 'ALERTS', 'RECONCILIATION', 'ANALYTICS', 'SETTINGS'];
+const VALID_VIEWS: ViewState[] = ['MAP', 'STATIONS', 'SALES', 'TANKS', 'ALERTS', 'RECONCILIATION', 'ACCOUNTS', 'ANALYTICS', 'SETTINGS'];
 
 const LoadingFallback = () => (
   <div className="flex items-center justify-center h-full">
@@ -359,6 +360,16 @@ const Dashboard: React.FC = () => {
                 dailyClosings={dailyClosings}
                 alerts={alerts}
                 onAddNotes={addNotes}
+                currentUser={currentUser}
+              />
+            </Suspense>
+          )}
+
+          {/* ACCOUNTS (Cuentas Corrientes) */}
+          {currentView === 'ACCOUNTS' && (
+            <Suspense fallback={<LoadingFallback />}>
+              <CardPaymentsView
+                stations={stations}
                 currentUser={currentUser}
               />
             </Suspense>

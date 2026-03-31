@@ -84,6 +84,8 @@ export interface DbTankLevelRow {
   product_name: string;
   level_liters: number | string;
   capacity_liters?: number | string | null;
+  sold_liters?: number | string | null;
+  sold_amount?: number | string | null;
   raw_line?: string | null;
   ingested_at?: string;
 }

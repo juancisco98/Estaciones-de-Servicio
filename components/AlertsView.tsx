@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { AlertTriangle, CheckCircle, Filter, Search, Clock } from 'lucide-react';
 import { Alert, AlertLevel, AlertType, Station, User } from '../types';
 import { ALERT_LEVEL_LABELS, ALERT_LEVEL_COLORS } from '../constants';
+import StationFilter from './StationFilter';
 
 interface AlertsViewProps {
     alerts: Alert[];
@@ -96,6 +97,7 @@ const AlertsView: React.FC<AlertsViewProps> = ({ alerts, stations, onResolveAler
     const [search, setSearch]             = useState('');
     const [filterLevel, setFilterLevel]   = useState<AlertLevel | 'ALL'>('ALL');
     const [showResolved, setShowResolved] = useState(false);
+    const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
 
     const stationMap = useMemo(() =>
         new Map(stations.map(s => [s.id, s.name])),
@@ -104,6 +106,7 @@ const AlertsView: React.FC<AlertsViewProps> = ({ alerts, stations, onResolveAler
     const filtered = useMemo(() => {
         let list = [...alerts];
         if (!showResolved) list = list.filter(a => !a.resolved);
+        if (selectedStationId) list = list.filter(a => a.stationId === selectedStationId);
         if (filterLevel !== 'ALL') list = list.filter(a => a.level === filterLevel);
         if (search.trim()) {
             const q = search.toLowerCase();
@@ -119,7 +122,7 @@ const AlertsView: React.FC<AlertsViewProps> = ({ alerts, stations, onResolveAler
             if (ld !== 0) return ld;
             return b.createdAt.localeCompare(a.createdAt);
         });
-    }, [alerts, showResolved, filterLevel, search, stationMap]);
+    }, [alerts, showResolved, selectedStationId, filterLevel, search, stationMap]);
 
     const unresolved = alerts.filter(a => !a.resolved);
     const critical   = unresolved.filter(a => a.level === 'CRITICAL');
@@ -148,6 +151,12 @@ const AlertsView: React.FC<AlertsViewProps> = ({ alerts, stations, onResolveAler
 
                 {/* Filters */}
                 <div className="flex items-center gap-3 flex-wrap">
+                    <StationFilter
+                        stations={stations}
+                        selectedStationId={selectedStationId}
+                        onChange={setSelectedStationId}
+                        className="min-w-[200px]"
+                    />
                     <div className="relative flex-1 min-w-[180px]">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                         <input

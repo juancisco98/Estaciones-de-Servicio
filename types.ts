@@ -102,6 +102,8 @@ export interface TankLevel {
   productName: string;
   levelLiters: number;       // current stock ← key for inventory alerting
   capacityLiters?: number;
+  soldLiters?: number;       // liters sold this shift (from T*.TXT)
+  soldAmount?: number;       // revenue from fuel sold this shift (from T*.TXT)
   rawLine?: string;
   ingestedAt?: string;
 }
