@@ -20,10 +20,16 @@ interface ProductGroup {
     count: number;
 }
 
+const MAX_FUEL_CODE = 20;
+
 const DayBreakdown: React.FC<{ transactions: SalesTransaction[] }> = ({ transactions }) => {
     const products = useMemo(() => {
         const map = new Map<string, ProductGroup>();
         for (const t of transactions) {
+            // Solo productos de tienda (code > 20), excluir combustibles
+            const code = Number(t.productCode);
+            if (code > 0 && code <= MAX_FUEL_CODE) continue;
+
             const key = t.productName;
             const existing = map.get(key);
             if (existing) {
