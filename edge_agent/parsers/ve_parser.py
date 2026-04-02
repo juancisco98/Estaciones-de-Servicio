@@ -46,10 +46,10 @@ _VE_LINE_RE = re.compile(
     r'^(\d{8})\s+'          # [1] date: DDMMYYYY
     r'(\d{2}:\d{2})\s+'     # [2] time: HH:MM
     r'(\d+)\s+'             # [3] product_code
-    r'([\d.]+)\s+'          # [4] quantity (decimal)
+    r'(-?[\d.]+)\s+'        # [4] quantity (decimal, can be negative)
     r'(.+?)\s{2,}'          # [5] product_name (non-greedy, ends at 2+ spaces)
-    r'(\d+)\s+'             # [6] unit_price (integer)
-    r'(\d+)\s+'             # [7] total_amount (integer)
+    r'(-?\d+)\s+'           # [6] unit_price (integer, can be negative)
+    r'(-?\d+)\s+'           # [7] total_amount (integer, can be negative)
     r'(\d+)\s+'             # [8] ticket_number
     r'(\d+)\s+'             # [9] turno
     r'(\d+)\s+'             # [10] area_code (1=playa, 0=salon)

@@ -201,20 +201,21 @@ def process_file(
     # Upload (retries handled internally by uploader)
     success = uploader.upload_parse_result(result)
 
-    state.mark_processed(
-        file_path=file_path,
-        md5=file_md5,
-        records_inserted=result.lines_ok if success else 0,
-        errors=result.errors,
-    )
-
     if success:
+        # Solo marcar como procesado si el upload fue exitoso
+        state.mark_processed(
+            file_path=file_path,
+            md5=file_md5,
+            records_inserted=result.lines_ok,
+            errors=result.errors,
+        )
         logger.info(
             "%s: %d/%d lines -> Supabase (%d errors)",
             result.file_name, result.lines_ok, result.lines_parsed, len(result.errors),
         )
     else:
-        logger.error("FAIL %s: upload failed - written to dead letter queue", result.file_name)
+        # NO marcar como procesado — se reintentara en el proximo scan
+        logger.error("FAIL %s: upload failed - se reintentara en el proximo escaneo", result.file_name)
 
 
 # ─── Watchdog event handler ───────────────────────────────────────────────────
