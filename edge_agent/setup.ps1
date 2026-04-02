@@ -362,7 +362,7 @@ if ($svcState -match "RUNNING") {
         Get-Content $logFile -Tail 5 | ForEach-Object { Write-Host "    $_" -ForegroundColor Gray }
     }
     Write-Host ""
-    Write-Host "  Procesando archivos existentes manualmente..." -ForegroundColor Yellow
+    Write-Host "  Procesando archivos existentes..." -ForegroundColor Yellow
     Push-Location $INSTALL_DIR
     python -c "
 import sys
@@ -372,14 +372,23 @@ from pathlib import Path
 from threading import Event
 import threading
 stop = Event()
-threading.Timer(15, stop.set).start()
+threading.Timer(60, stop.set).start()
 main(config_path=Path('config.yaml'), stop_event=stop)
 " 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor Gray }
     Pop-Location
-    Write-Host ""
-    Write-Host "  Archivos procesados. Los datos deberian aparecer en el dashboard." -ForegroundColor Green
-    Write-Host "  NOTA: El servicio no quedo corriendo. Para moniteo continuo," -ForegroundColor Yellow
-    Write-Host "  ejecuta: cd C:\StationOS && python service.py debug" -ForegroundColor Yellow
+    Write-Host "  OK: Archivos existentes procesados." -ForegroundColor Green
+
+    # Crear tarea programada para escanear cada 8 horas (turnos 06:00, 14:00, 22:00)
+    Write-Host "  Configurando escaneo automatico cada 8 horas..." -ForegroundColor Gray
+    $taskAction = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c cd /d C:\StationOS && python -c `"import sys; sys.path.insert(0,'.'); from watcher import main; from pathlib import Path; from threading import Event; import threading; stop=Event(); threading.Timer(120,stop.set).start(); main(config_path=Path('config.yaml'),stop_event=stop)`"" -WorkingDirectory "C:\StationOS"
+    $taskTriggers = @(
+        New-ScheduledTaskTrigger -Daily -At "06:15"
+        New-ScheduledTaskTrigger -Daily -At "14:15"
+        New-ScheduledTaskTrigger -Daily -At "22:15"
+    )
+    $taskSettings = New-ScheduledTaskSettingsSet -StartWhenAvailable -DontStopOnIdleEnd
+    Register-ScheduledTask -TaskName "StationOS-Scan" -Action $taskAction -Trigger $taskTriggers -Settings $taskSettings -User "SYSTEM" -RunLevel Highest -Force -ErrorAction SilentlyContinue | Out-Null
+    Write-Host "  OK: Escaneo automatico a las 06:15, 14:15, 22:15" -ForegroundColor Green
 }
 
 # ─── Final Status ─────────────────────────────────────────────────────────────
