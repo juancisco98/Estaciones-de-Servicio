@@ -12,13 +12,12 @@ interface SalesHistoryViewProps {
 }
 
 const getToday = () => new Date().toISOString().slice(0, 10);
-const getThirtyDaysAgo = () => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
 const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ stations, salesTransactions, currentUser, activeStationId, onStationChange }) => {
     const [selectedStation, setSelectedStation] = useState<string>(
         activeStationId ?? currentUser?.stationId ?? (stations[0]?.id ?? '')
     );
-    const [dateFrom, setDateFrom] = useState(getThirtyDaysAgo);
+    const [dateFrom, setDateFrom] = useState(getToday);
     const [dateTo, setDateTo]     = useState(getToday);
     const [search, setSearch]     = useState('');
 

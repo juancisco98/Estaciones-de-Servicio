@@ -98,7 +98,7 @@ const DayBreakdown: React.FC<{ transactions: SalesTransaction[] }> = ({ transact
 
 const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, salesTransactions, currentUser, activeStationId, onStationChange }) => {
     const [search, setSearch] = useState('');
-    const [dateFrom, setDateFrom] = useState(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+    const [dateFrom, setDateFrom] = useState(new Date().toISOString().slice(0, 10));
     const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10));
     const [selectedStationId, setSelectedStationId] = useState<string | null>(activeStationId ?? null);
     const [expandedId, setExpandedId] = useState<string | null>(null);

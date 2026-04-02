@@ -13,7 +13,6 @@ interface CardPaymentsViewProps {
 }
 
 const getToday = () => new Date().toISOString().slice(0, 10);
-const getThirtyDaysAgo = () => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
 const PAYMENT_TYPE_COLORS: Record<string, string> = {
     CARD:        'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',
@@ -30,7 +29,7 @@ const CardPaymentsView: React.FC<CardPaymentsViewProps> = ({ stations, currentUs
         setSelectedStationId(id);
         onStationChange?.(id);
     };
-    const [dateFrom, setDateFrom] = useState(getThirtyDaysAgo);
+    const [dateFrom, setDateFrom] = useState(getToday);
     const [dateTo, setDateTo]     = useState(getToday);
     const [filterType, setFilterType] = useState<string>('');
     const [search, setSearch]     = useState('');
