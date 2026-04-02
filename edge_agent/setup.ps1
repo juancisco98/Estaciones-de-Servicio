@@ -136,8 +136,9 @@ try {
     $emailHeaders["Prefer"] = "resolution=merge-duplicates,return=minimal"
 
     $emailBody = @{ email = $OwnerEmail.ToLower() } | ConvertTo-Json
+    $emailBodyBytes = [System.Text.Encoding]::UTF8.GetBytes($emailBody)
     Invoke-RestMethod -Uri "$SUPABASE_URL/rest/v1/allowed_emails?on_conflict=email" `
-        -Method POST -Headers $emailHeaders -Body $emailBody | Out-Null
+        -Method POST -Headers $emailHeaders -Body $emailBodyBytes | Out-Null
 
     Write-Host "  OK: Email registrado" -ForegroundColor Green
 } catch {
@@ -157,8 +158,9 @@ try {
         is_active   = $true
     } | ConvertTo-Json
 
+    $stationBodyBytes = [System.Text.Encoding]::UTF8.GetBytes($stationBody)
     $response = Invoke-RestMethod -Uri "$SUPABASE_URL/rest/v1/stations" `
-        -Method POST -Headers $stationHeaders -Body $stationBody
+        -Method POST -Headers $stationHeaders -Body $stationBodyBytes
 
     # Response is an array
     if ($response -is [System.Array]) {
