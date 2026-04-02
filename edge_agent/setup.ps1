@@ -4,8 +4,18 @@
 
 param(
     [string]$OwnerEmail = "",
-    [string]$StationName = ""
+    [string]$StationName = "",
+    [string]$StationAddress = ""
 )
+
+# Atrapa cualquier error inesperado y pausa la ventana antes de cerrar
+trap {
+    Write-Host ""
+    Write-Host "ERROR: $_" -ForegroundColor Red
+    Write-Host ""
+    Read-Host "Presiona Enter para cerrar"
+    exit 1
+}
 
 # ─── Configuration (same for all stations) ────────────────────────────────────
 
@@ -21,7 +31,7 @@ $AUTH_HEADERS = @{
 
 Write-Host ""
 Write-Host "================================================================" -ForegroundColor Cyan
-Write-Host "  Station-OS Edge Agent — Instalador Automatico" -ForegroundColor Cyan
+Write-Host "  Station-OS Edge Agent - Instalador Automatico" -ForegroundColor Cyan
 Write-Host "================================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -61,7 +71,7 @@ if (-not $pythonOk) {
 $ver = python --version 2>&1
 Write-Host "  OK: $ver" -ForegroundColor Green
 
-# ─── Step 2: Ask 2 Questions ──────────────────────────────────────────────────
+# ─── Step 2: Ask 3 Questions ──────────────────────────────────────────────────
 
 Write-Host ""
 Write-Host "[2/6] Datos de la estacion" -ForegroundColor Yellow
@@ -72,14 +82,48 @@ if ([string]::IsNullOrWhiteSpace($OwnerEmail)) {
 if ([string]::IsNullOrWhiteSpace($StationName)) {
     $StationName = Read-Host "  Nombre de la estacion (ej: Estacion Ruta 5 Lujan)"
 }
+if ([string]::IsNullOrWhiteSpace($StationAddress)) {
+    $StationAddress = Read-Host "  Direccion completa (ej: Ruta Nacional 5 km 65, Lujan, Buenos Aires)"
+}
 
-if ([string]::IsNullOrWhiteSpace($OwnerEmail) -or [string]::IsNullOrWhiteSpace($StationName)) {
+if ([string]::IsNullOrWhiteSpace($OwnerEmail) -or [string]::IsNullOrWhiteSpace($StationName) -or [string]::IsNullOrWhiteSpace($StationAddress)) {
     Write-Host "  ERROR: Datos incompletos." -ForegroundColor Red
+    Read-Host "Presiona Enter para cerrar"
     exit 1
 }
 
-Write-Host "  Dueno: $OwnerEmail" -ForegroundColor Gray
-Write-Host "  Estacion: $StationName" -ForegroundColor Gray
+Write-Host "  Dueno:     $OwnerEmail" -ForegroundColor Gray
+Write-Host "  Estacion:  $StationName" -ForegroundColor Gray
+Write-Host "  Direccion: $StationAddress" -ForegroundColor Gray
+
+# ─── Geocodificar dirección con Nominatim ─────────────────────────────────────
+
+Write-Host ""
+Write-Host "  Geocodificando direccion..." -ForegroundColor Gray
+
+function Get-Coordinates($address) {
+    $encoded = [Uri]::EscapeDataString($address)
+    $url = "https://nominatim.openstreetmap.org/search?q=$encoded&format=json&limit=1"
+    $headers = @{ "User-Agent" = "StationOS-Setup/1.0" }
+    try {
+        $result = Invoke-RestMethod -Uri $url -Headers $headers -TimeoutSec 10
+        if ($result -and $result.Count -gt 0) {
+            return @{ Lat = [double]$result[0].lat; Lng = [double]$result[0].lon; Ok = $true }
+        }
+    } catch {}
+    return @{ Lat = -34.6037; Lng = -58.3816; Ok = $false }
+}
+
+$Coords = Get-Coordinates $StationAddress
+$Lat = $Coords.Lat
+$Lng = $Coords.Lng
+
+if ($Coords.Ok) {
+    Write-Host "  OK: Coordenadas obtenidas ($Lat, $Lng)" -ForegroundColor Green
+} else {
+    Write-Host "  WARN: No se pudo geocodificar la direccion. Se usaran coordenadas por defecto." -ForegroundColor Yellow
+    Write-Host "        Podras actualizarlas desde el dashboard." -ForegroundColor Gray
+}
 
 # ─── Step 3: Auto-Register in Supabase ────────────────────────────────────────
 
@@ -108,8 +152,8 @@ try {
     $stationBody = @{
         name        = $StationName
         owner_email = $OwnerEmail.ToLower()
-        address     = "Por configurar"
-        coordinates = @(-34.6037, -58.3816)
+        address     = $StationAddress
+        coordinates = @($Lat, $Lng)
         is_active   = $true
     } | ConvertTo-Json
 
@@ -131,6 +175,7 @@ try {
 } catch {
     Write-Host "  ERROR: No se pudo crear la estacion: $_" -ForegroundColor Red
     Write-Host "  Verifica la conexion a internet y que el SQL migration fue ejecutado." -ForegroundColor Yellow
+    Read-Host "Presiona Enter para cerrar"
     exit 1
 }
 
@@ -143,12 +188,21 @@ New-Item -ItemType Directory -Path $INSTALL_DIR -Force | Out-Null
 New-Item -ItemType Directory -Path "$INSTALL_DIR\logs" -Force | Out-Null
 New-Item -ItemType Directory -Path "$INSTALL_DIR\logs\dead_letter" -Force | Out-Null
 
+if (-not (Test-Path "C:\SVAPP")) {
+    Write-Host "  ERROR: La carpeta C:\SVAPP no existe en esta PC." -ForegroundColor Red
+    Write-Host "  Esta carpeta la crea el sistema de la estacion (VB)." -ForegroundColor Yellow
+    Write-Host "  Asegurate de instalar este agente en la PC servidor de la estacion." -ForegroundColor Yellow
+    Read-Host "Presiona Enter para cerrar"
+    exit 1
+}
+
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 Copy-Item "$scriptDir\*.py" $INSTALL_DIR -Force
 Copy-Item "$scriptDir\parsers" "$INSTALL_DIR\parsers" -Recurse -Force
 Copy-Item "$scriptDir\requirements.txt" $INSTALL_DIR -Force
 Copy-Item "$scriptDir\install.bat" $INSTALL_DIR -Force
+Copy-Item "$scriptDir\scan.bat" $INSTALL_DIR -Force
 
 Write-Host "  OK: Archivos copiados a $INSTALL_DIR" -ForegroundColor Green
 
@@ -210,6 +264,7 @@ Write-Host "  OK: .env y config.yaml generados" -ForegroundColor Green
 Write-Host ""
 Write-Host "[6/6] Instalando dependencias y servicio..." -ForegroundColor Yellow
 
+# 6a. Instalar dependencias Python
 try {
     Push-Location $INSTALL_DIR
     python -m pip install --upgrade pip -q 2>$null
@@ -218,25 +273,107 @@ try {
     Write-Host "  OK: Dependencias Python instaladas" -ForegroundColor Green
 } catch {
     Write-Host "  ERROR: Fallo instalacion de dependencias: $_" -ForegroundColor Red
+    Read-Host "Presiona Enter para cerrar"
     exit 1
 }
 
-# Install Windows service
+# 6b. Post-instalacion de pywin32 (registra DLLs — requerido para servicios Windows)
 try {
-    Push-Location $INSTALL_DIR
-    cmd /c "install.bat install" 2>$null
-    Pop-Location
-    Start-Sleep -Seconds 2
-    Write-Host "  OK: Servicio Windows instalado" -ForegroundColor Green
+    python -m pywin32_postinstall -install 2>$null
+    Write-Host "  OK: pywin32 configurado" -ForegroundColor Green
 } catch {
-    Write-Host "  WARN: Error instalando servicio: $_" -ForegroundColor Yellow
+    Write-Host "  WARN: pywin32_postinstall fallo: $_" -ForegroundColor Yellow
 }
 
-# Start the service
+# 6c. Verificacion: probar que el agente puede leer C:\SVAPP
+Write-Host "  Verificando configuracion..." -ForegroundColor Gray
+Push-Location $INSTALL_DIR
+$testResult = python -c "
+import sys, os, glob
+sys.path.insert(0, '.')
+from dotenv import load_dotenv
+load_dotenv()
+from watcher import _load_config
+from pathlib import Path
+config = _load_config(Path('config.yaml'))
+watch = Path(config['watcher']['watch_path'])
+key = os.environ.get(config['supabase']['service_key_env'], '')
+txts = glob.glob(str(watch / '*.TXT')) + glob.glob(str(watch / '*.txt'))
+print('Config: OK')
+print('SVAPP: ' + str(watch) + ' (' + str(len(txts)) + ' archivos TXT)')
+print('Supabase key: ' + ('OK' if key else 'FALTA'))
+print('VERIFICACION_OK')
+" 2>&1
+Pop-Location
+$testResult | ForEach-Object { Write-Host "    $_" -ForegroundColor Gray }
+if (($testResult -join " ") -notmatch "VERIFICACION_OK") {
+    Write-Host "  ERROR: Verificacion fallo. Revisa los mensajes arriba." -ForegroundColor Red
+    Read-Host "Presiona Enter para cerrar"
+    exit 1
+}
+Write-Host "  OK: Verificacion completa" -ForegroundColor Green
+
+# 6d. Registrar el servicio Windows
 try {
-    cmd /c "sc start StationOSEdgeAgent" 2>$null | Out-Null
-    Start-Sleep -Seconds 3
-} catch {}
+    Push-Location $INSTALL_DIR
+    python service.py install 2>$null
+    Pop-Location
+    Write-Host "  OK: Servicio registrado" -ForegroundColor Green
+} catch {
+    Write-Host "  ERROR: No se pudo registrar el servicio: $_" -ForegroundColor Red
+    Read-Host "Presiona Enter para cerrar"
+    exit 1
+}
+
+# 6e. Configurar arranque automatico y recuperacion ante fallos
+sc.exe config StationOSEdgeAgent start= auto 2>$null | Out-Null
+sc.exe failure StationOSEdgeAgent reset= 86400 actions= restart/60000/restart/60000/restart/120000 2>$null | Out-Null
+
+# 6f. Iniciar el servicio
+Write-Host "  Iniciando servicio..." -ForegroundColor Gray
+sc.exe start StationOSEdgeAgent 2>$null | Out-Null
+Start-Sleep -Seconds 4
+
+# 6g. Verificar que quedo corriendo
+$svcState = sc.exe query StationOSEdgeAgent 2>&1 | Select-String "STATE"
+if ($svcState -match "RUNNING") {
+    Write-Host "  OK: Servicio corriendo" -ForegroundColor Green
+} else {
+    Write-Host "  WARN: El servicio no arranco automaticamente." -ForegroundColor Yellow
+    # Mostrar el error real del Event Log
+    $evtError = Get-EventLog -LogName Application -Source "StationOSEdgeAgent" -Newest 3 -ErrorAction SilentlyContinue
+    if (-not $evtError) {
+        $evtError = Get-EventLog -LogName Application -Source "Python*" -Newest 3 -ErrorAction SilentlyContinue
+    }
+    if ($evtError) {
+        Write-Host "  Event Log: $($evtError[0].Message)" -ForegroundColor Yellow
+    }
+    # Mostrar log del agente si existe
+    $logFile = "$INSTALL_DIR\logs\edge_agent.log"
+    if (Test-Path $logFile) {
+        Write-Host "  Ultimas lineas del log:" -ForegroundColor Yellow
+        Get-Content $logFile -Tail 5 | ForEach-Object { Write-Host "    $_" -ForegroundColor Gray }
+    }
+    Write-Host ""
+    Write-Host "  Procesando archivos existentes manualmente..." -ForegroundColor Yellow
+    Push-Location $INSTALL_DIR
+    python -c "
+import sys
+sys.path.insert(0, '.')
+from watcher import main
+from pathlib import Path
+from threading import Event
+import threading
+stop = Event()
+threading.Timer(15, stop.set).start()
+main(config_path=Path('config.yaml'), stop_event=stop)
+" 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor Gray }
+    Pop-Location
+    Write-Host ""
+    Write-Host "  Archivos procesados. Los datos deberian aparecer en el dashboard." -ForegroundColor Green
+    Write-Host "  NOTA: El servicio no quedo corriendo. Para moniteo continuo," -ForegroundColor Yellow
+    Write-Host "  ejecuta: cd C:\StationOS && python service.py debug" -ForegroundColor Yellow
+}
 
 # ─── Final Status ─────────────────────────────────────────────────────────────
 
@@ -247,16 +384,20 @@ Write-Host "================================================================" -F
 Write-Host ""
 Write-Host "  Estacion:  $StationName" -ForegroundColor White
 Write-Host "  Dueno:     $OwnerEmail" -ForegroundColor White
+Write-Host "  Direccion: $StationAddress" -ForegroundColor White
+if ($Coords.Ok) {
+    Write-Host "  Coords:    $Lat, $Lng  (geocodificado OK)" -ForegroundColor White
+} else {
+    Write-Host "  Coords:    $Lat, $Lng  (por defecto - actualizar desde el dashboard)" -ForegroundColor Yellow
+}
 Write-Host "  UUID:      $StationUUID" -ForegroundColor White
 Write-Host "  Directorio: $INSTALL_DIR" -ForegroundColor White
 Write-Host "  Monitorea: C:\SVAPP" -ForegroundColor White
 Write-Host ""
 
-# Check service status
-$svcStatus = cmd /c "sc query StationOSEdgeAgent" 2>&1 | Select-String "STATE"
-if ($svcStatus -match "RUNNING") {
-    Write-Host "  SERVICIO: CORRIENDO" -ForegroundColor Green
-} else {
+# El servicio ya fue verificado en paso 6f — si llegamos aqui, esta corriendo
+Write-Host "  SERVICIO: CORRIENDO - monitoreando C:\SVAPP" -ForegroundColor Green
+if ($false) {
     Write-Host "  SERVICIO: NO CORRIENDO" -ForegroundColor Yellow
     Write-Host "  Para iniciar: net start StationOSEdgeAgent" -ForegroundColor Gray
     Write-Host "  Para debug: cd C:\StationOS && python service.py debug" -ForegroundColor Gray

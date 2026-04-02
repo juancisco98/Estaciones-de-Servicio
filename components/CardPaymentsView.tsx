@@ -8,6 +8,8 @@ import StationFilter from './StationFilter';
 interface CardPaymentsViewProps {
     stations: Station[];
     currentUser: User | null;
+    activeStationId?: string | null;
+    onStationChange?: (id: string | null) => void;
 }
 
 const getToday = () => new Date().toISOString().slice(0, 10);
@@ -20,9 +22,14 @@ const PAYMENT_TYPE_COLORS: Record<string, string> = {
     MERCADOPAGO: 'bg-sky-100 dark:bg-sky-500/20 text-sky-700 dark:text-sky-400',
 };
 
-const CardPaymentsView: React.FC<CardPaymentsViewProps> = ({ stations, currentUser }) => {
+const CardPaymentsView: React.FC<CardPaymentsViewProps> = ({ stations, currentUser, activeStationId, onStationChange }) => {
     const { cardPayments } = useCardPayments();
-    const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
+    const [selectedStationId, setSelectedStationId] = useState<string | null>(activeStationId ?? null);
+
+    const handleStationChange = (id: string | null) => {
+        setSelectedStationId(id);
+        onStationChange?.(id);
+    };
     const [dateFrom, setDateFrom] = useState(getThirtyDaysAgo);
     const [dateTo, setDateTo]     = useState(getToday);
     const [filterType, setFilterType] = useState<string>('');
@@ -73,7 +80,7 @@ const CardPaymentsView: React.FC<CardPaymentsViewProps> = ({ stations, currentUs
                     <StationFilter
                         stations={stations}
                         selectedStationId={selectedStationId}
-                        onChange={setSelectedStationId}
+                        onChange={handleStationChange}
                         className="min-w-[200px]"
                     />
 

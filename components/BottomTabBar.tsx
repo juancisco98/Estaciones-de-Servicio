@@ -44,7 +44,8 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({
     }[] = [
         { id: 'TANKS',          label: 'Tanques',        icon: Droplets },
         { id: 'STATIONS',      label: 'Estaciones',     icon: Gauge },
-        { id: 'RECONCILIATION', label: 'Reconciliación', icon: ClipboardCheck },
+        { id: 'PLAYA',          label: 'Playa',           icon: ClipboardCheck },
+        { id: 'SHOP',           label: 'Mini Mercado',    icon: ClipboardCheck },
         { id: 'ANALYTICS',     label: 'Analytics',      icon: BarChart3 },
         { id: 'SETTINGS',      label: 'Ajustes',        icon: Settings },
     ];

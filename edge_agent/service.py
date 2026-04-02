@@ -47,6 +47,13 @@ except ImportError:
 _AGENT_DIR = Path(__file__).parent
 _DEFAULT_CONFIG = _AGENT_DIR / "config.yaml"
 
+# Asegurar que el directorio del agente esta en sys.path.
+# Cuando Windows ejecuta el servicio, el CWD es C:\Windows\System32
+# y las importaciones relativas fallan. Esto permite usar imports absolutos.
+_agent_dir_str = str(_AGENT_DIR)
+if _agent_dir_str not in sys.path:
+    sys.path.insert(0, _agent_dir_str)
+
 logger = logging.getLogger("station_os.service")
 
 # ── Service constants ─────────────────────────────────────────────────────────
@@ -123,7 +130,7 @@ if _WIN32_AVAILABLE:
 
         def _start_watcher(self) -> None:
             """Start watcher.main() in a daemon thread."""
-            from .watcher import main as run_watcher
+            from watcher import main as run_watcher
 
             config_path = _DEFAULT_CONFIG
 
@@ -151,7 +158,7 @@ def run_debug() -> None:
     Press Ctrl+C to stop.
     """
     import logging
-    from .watcher import _setup_logging, _load_config, main as run_watcher
+    from watcher import _setup_logging, _load_config, main as run_watcher
 
     config = _load_config(_DEFAULT_CONFIG)
     _setup_logging(config)

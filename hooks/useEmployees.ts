@@ -32,7 +32,9 @@ export const useEmployees = () => {
             );
             toast.success(isNew ? 'Empleado registrado' : 'Empleado actualizado');
             return true;
-        } catch {
+        } catch (error) {
+            console.error('[useEmployees] Error guardando empleado:', error);
+            toast.error('Error al guardar empleado', { description: error instanceof Error ? error.message : 'Error desconocido' });
             return false;
         }
     }, [setEmployees]);
@@ -43,7 +45,9 @@ export const useEmployees = () => {
             setEmployees(prev => prev.map(e => e.id === id ? { ...e, isActive: false } : e));
             toast.success('Empleado desactivado');
             return true;
-        } catch {
+        } catch (error) {
+            console.error('[useEmployees] Error desactivando empleado:', error);
+            toast.error('Error al desactivar empleado', { description: error instanceof Error ? error.message : 'Error desconocido' });
             return false;
         }
     }, [setEmployees]);

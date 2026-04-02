@@ -7,14 +7,16 @@ interface SalesHistoryViewProps {
     stations: Station[];
     salesTransactions: SalesTransaction[];
     currentUser: User | null;
+    activeStationId?: string | null;
+    onStationChange?: (id: string | null) => void;
 }
 
 const getToday = () => new Date().toISOString().slice(0, 10);
 const getThirtyDaysAgo = () => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ stations, salesTransactions, currentUser }) => {
+const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ stations, salesTransactions, currentUser, activeStationId, onStationChange }) => {
     const [selectedStation, setSelectedStation] = useState<string>(
-        currentUser?.stationId ?? (stations[0]?.id ?? '')
+        activeStationId ?? currentUser?.stationId ?? (stations[0]?.id ?? '')
     );
     const [dateFrom, setDateFrom] = useState(getThirtyDaysAgo);
     const [dateTo, setDateTo]     = useState(getToday);
@@ -55,7 +57,7 @@ const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ stations, salesTran
                     {currentUser?.role === 'ADMIN' && (
                         <select
                             value={selectedStation}
-                            onChange={e => setSelectedStation(e.target.value)}
+                            onChange={e => { setSelectedStation(e.target.value); onStationChange?.(e.target.value || null); }}
                             className="text-sm rounded-xl bg-gray-100 dark:bg-slate-800 border border-transparent text-gray-800 dark:text-white px-4 py-2.5 min-h-[44px] focus:outline-none focus:border-amber-400"
                         >
                             <option value="">Todas las estaciones</option>

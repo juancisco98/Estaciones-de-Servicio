@@ -8,6 +8,8 @@ import StationFilter from './StationFilter';
 interface TankLevelsViewProps {
     stations: Station[];
     currentUser: User | null;
+    activeStationId?: string | null;
+    onStationChange?: (id: string | null) => void;
 }
 
 const TankBar: React.FC<{ levelLiters: number; capacityLiters?: number; alertLevel: 'OK' | 'WARNING' | 'CRITICAL' }> = ({
@@ -140,9 +142,14 @@ const StationTankPanel: React.FC<{ station: Station }> = ({ station }) => {
     );
 };
 
-const TankLevelsView: React.FC<TankLevelsViewProps> = ({ stations, currentUser }) => {
+const TankLevelsView: React.FC<TankLevelsViewProps> = ({ stations, currentUser, activeStationId, onStationChange }) => {
     const { getLowTanks, getCriticalTanks } = useTankLevels();
-    const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
+    const [selectedStationId, setSelectedStationId] = useState<string | null>(activeStationId ?? null);
+
+    const handleStationChange = (id: string | null) => {
+        setSelectedStationId(id);
+        onStationChange?.(id);
+    };
 
     const activeStations = useMemo(() => {
         const active = stations.filter(s => s.isActive);
@@ -170,7 +177,7 @@ const TankLevelsView: React.FC<TankLevelsViewProps> = ({ stations, currentUser }
                     <StationFilter
                         stations={stations}
                         selectedStationId={selectedStationId}
-                        onChange={setSelectedStationId}
+                        onChange={handleStationChange}
                         className="min-w-[200px]"
                     />
                     <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-slate-400">

@@ -13,7 +13,8 @@ export type ViewState =
     | 'SALES'
     | 'TANKS'
     | 'ALERTS'
-    | 'RECONCILIATION'
+    | 'PLAYA'
+    | 'SHOP'
     | 'ACCOUNTS'
     | 'ANALYTICS'
     | 'SETTINGS';
@@ -65,13 +66,8 @@ const Sidebar: React.FC<SidebarProps> = ({
             badge: unresolvedAlertCount > 0 ? unresolvedAlertCount : undefined,
             badgeVariant: criticalAlertCount > 0 ? 'red' : 'amber',
         },
-        {
-            id: 'RECONCILIATION',
-            label: 'Reconciliación',
-            icon: ClipboardCheck,
-            badge: discrepancyCount > 0 ? discrepancyCount : undefined,
-            badgeVariant: 'red',
-        },
+        { id: 'PLAYA',           label: 'Playa',          icon: Fuel },
+        { id: 'SHOP',            label: 'Mini Mercado',   icon: ClipboardCheck },
         { id: 'ACCOUNTS',       label: 'Cuentas Ctes.',  icon: CreditCard },
         { id: 'ANALYTICS',      label: 'Analytics',      icon: BarChart3 },
         { id: 'SETTINGS',       label: 'Ajustes',        icon: Settings },

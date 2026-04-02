@@ -9,6 +9,8 @@ interface AlertsViewProps {
     stations: Station[];
     onResolveAlert: (id: string) => void;
     currentUser: User | null;
+    activeStationId?: string | null;
+    onStationChange?: (id: string | null) => void;
 }
 
 const LEVEL_ORDER: Record<AlertLevel, number> = { CRITICAL: 0, WARNING: 1, INFO: 2 };
@@ -93,11 +95,16 @@ const AlertCard: React.FC<{
     );
 };
 
-const AlertsView: React.FC<AlertsViewProps> = ({ alerts, stations, onResolveAlert, currentUser }) => {
+const AlertsView: React.FC<AlertsViewProps> = ({ alerts, stations, onResolveAlert, currentUser, activeStationId, onStationChange }) => {
     const [search, setSearch]             = useState('');
     const [filterLevel, setFilterLevel]   = useState<AlertLevel | 'ALL'>('ALL');
     const [showResolved, setShowResolved] = useState(false);
-    const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
+    const [selectedStationId, setSelectedStationId] = useState<string | null>(activeStationId ?? null);
+
+    const handleStationChange = (id: string | null) => {
+        setSelectedStationId(id);
+        onStationChange?.(id);
+    };
 
     const stationMap = useMemo(() =>
         new Map(stations.map(s => [s.id, s.name])),
@@ -154,7 +161,7 @@ const AlertsView: React.FC<AlertsViewProps> = ({ alerts, stations, onResolveAler
                     <StationFilter
                         stations={stations}
                         selectedStationId={selectedStationId}
-                        onChange={setSelectedStationId}
+                        onChange={handleStationChange}
                         className="min-w-[200px]"
                     />
                     <div className="relative flex-1 min-w-[180px]">

@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { Station } from '../types';
 import { useDataContext } from '../context/DataContext';
 import { stationToDb } from '../utils/mappers';
-import { supabaseUpsert, supabaseUpdate } from '../utils/supabaseHelpers';
+import { supabaseUpsert, supabaseUpdate, supabaseDelete } from '../utils/supabaseHelpers';
 import { supabase } from '../services/supabaseClient';
 import { generateUUID } from '../utils/generateUUID';
 
@@ -29,11 +29,21 @@ export const useStations = () => {
                 }
             }
 
+            // Validar coordenadas
+            const coords = data.coordinates;
+            if (!coords || coords.length !== 2
+                || isNaN(coords[0]) || isNaN(coords[1])
+                || coords[0] < -90 || coords[0] > 90
+                || coords[1] < -180 || coords[1] > 180) {
+                toast.error('Coordenadas inválidas', { description: 'Ingresá una ubicación válida para la estación' });
+                return false;
+            }
+
             const station: Station = {
                 id:          data.id ?? generateUUID(),
                 name:        data.name,
                 address:     data.address,
-                coordinates: data.coordinates ?? [-34.6037, -58.3816],
+                coordinates: coords,
                 city:        data.city,
                 province:    data.province,
                 phone:       data.phone,
@@ -52,7 +62,9 @@ export const useStations = () => {
             );
             toast.success(isNew ? 'Estación creada' : 'Estación actualizada');
             return true;
-        } catch {
+        } catch (error) {
+            console.error('[useStations] Error guardando estación:', error);
+            toast.error('Error al guardar estación', { description: error instanceof Error ? error.message : 'Error desconocido' });
             return false;
         }
     }, [stations, setStations]);
@@ -66,10 +78,25 @@ export const useStations = () => {
             setStations(prev => prev.map(s => s.id === id ? { ...s, isActive: newActive } : s));
             toast.success(newActive ? 'Estación activada' : 'Estación desactivada');
             return true;
-        } catch {
+        } catch (error) {
+            console.error('[useStations] Error cambiando estado:', error);
+            toast.error('Error al actualizar estación', { description: error instanceof Error ? error.message : 'Error desconocido' });
             return false;
         }
     }, [stations, setStations]);
+
+    const deleteStation = useCallback(async (id: string): Promise<boolean> => {
+        try {
+            await supabaseDelete('stations', id, 'estación');
+            setStations(prev => prev.filter(s => s.id !== id));
+            toast.success('Estación eliminada permanentemente');
+            return true;
+        } catch (error) {
+            console.error('[useStations] Error eliminando estación:', error);
+            toast.error('Error al eliminar estación', { description: error instanceof Error ? error.message : 'Error desconocido' });
+            return false;
+        }
+    }, [setStations]);
 
     const getActiveStations = useCallback(() =>
         stations.filter(s => s.isActive),
@@ -79,5 +106,5 @@ export const useStations = () => {
         stations.find(s => s.id === id),
     [stations]);
 
-    return { stations, saveStation, deactivateStation, getActiveStations, getStationById };
+    return { stations, saveStation, deactivateStation, deleteStation, getActiveStations, getStationById };
 };

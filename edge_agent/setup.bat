@@ -9,6 +9,6 @@ set SCRIPT_DIR=%~dp0
 set SETUP_PS1=%SCRIPT_DIR%setup.ps1
 
 REM Launch PowerShell setup script with elevated privileges
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& {Start-Process PowerShell -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File \"%SETUP_PS1%\"' -Verb RunAs}"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& {Start-Process PowerShell -ArgumentList '-NoProfile -ExecutionPolicy Bypass -NoExit -File \"%SETUP_PS1%\"' -Verb RunAs}"
 
 endlocal

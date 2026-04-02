@@ -33,7 +33,10 @@ from tenacity import (
     before_sleep_log,
 )
 
-from .parsers.base_parser import ParseResult
+try:
+    from .parsers.base_parser import ParseResult
+except ImportError:
+    from parsers.base_parser import ParseResult
 
 logger = logging.getLogger(__name__)
 

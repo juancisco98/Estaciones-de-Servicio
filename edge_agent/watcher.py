@@ -58,8 +58,12 @@ from dotenv import load_dotenv
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
 from watchdog.observers import Observer
 
-from .parsers import FILE_PREFIX_MAP, BaseParser
-from .uploader import SupabaseUploader
+try:
+    from .parsers import FILE_PREFIX_MAP, BaseParser
+    from .uploader import SupabaseUploader
+except ImportError:
+    from parsers import FILE_PREFIX_MAP, BaseParser
+    from uploader import SupabaseUploader
 
 
 # ─── Constants ───────────────────────────────────────────────────────────────

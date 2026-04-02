@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Search, MapPin, Gauge, Users, AlertTriangle, Power, Edit2, ChevronRight } from 'lucide-react';
+import { Plus, Search, MapPin, Gauge, Users, AlertTriangle, Power, Edit2, ChevronRight, Trash2 } from 'lucide-react';
 import { Station, Employee, Alert, User } from '../types';
 import { useAlerts } from '../hooks/useAlerts';
 import StationFormModal from './StationFormModal';
@@ -10,6 +10,7 @@ interface StationsViewProps {
     alerts: Alert[];
     onSaveStation: (station: Omit<Station, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => Promise<boolean>;
     onDeactivateStation: (id: string) => Promise<boolean>;
+    onDeleteStation: (id: string) => Promise<boolean>;
     onViewOnMap: (station: Station) => void;
     currentUser?: User | null;
 }
@@ -24,10 +25,12 @@ const StationsView: React.FC<StationsViewProps> = ({
     alerts,
     onSaveStation,
     onDeactivateStation,
+    onDeleteStation,
     onViewOnMap,
     currentUser,
 }) => {
     const [search, setSearch]       = useState('');
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [showInactive, setShowInactive] = useState(false);
     const [showModal, setShowModal] = useState(false);
     const [editingStation, setEditingStation] = useState<Station | null>(null);
@@ -216,6 +219,30 @@ const StationsView: React.FC<StationsViewProps> = ({
                                                 >
                                                     <Power className="w-3 h-3" />
                                                     {station.isActive ? 'Desactivar' : 'Activar'}
+                                                </button>
+                                            )}
+                                            <span className="text-gray-200 dark:text-slate-700">·</span>
+                                            {confirmDeleteId === station.id ? (
+                                                <div className="flex items-center gap-1">
+                                                    <button
+                                                        onClick={() => { onDeleteStation(station.id); setConfirmDeleteId(null); }}
+                                                        className="text-[10px] font-bold text-white bg-red-600 hover:bg-red-700 px-2 py-0.5 rounded-lg transition-colors"
+                                                    >
+                                                        Eliminar
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setConfirmDeleteId(null)}
+                                                        className="text-[10px] font-bold text-gray-400 hover:text-gray-600 px-1"
+                                                    >
+                                                        No
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    onClick={() => setConfirmDeleteId(station.id)}
+                                                    className="flex items-center gap-1.5 text-sm font-semibold text-gray-400 hover:text-red-500 dark:hover:text-red-400 min-h-[36px]"
+                                                >
+                                                    <Trash2 className="w-3 h-3" />
                                                 </button>
                                             )}
                                         </>

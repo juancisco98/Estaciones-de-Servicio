@@ -31,13 +31,14 @@ const StationsView       = lazy(() => import('./components/StationsView'));
 const SalesHistoryView   = lazy(() => import('./components/SalesHistoryView'));
 const TankLevelsView     = lazy(() => import('./components/TankLevelsView'));
 const AlertsView         = lazy(() => import('./components/AlertsView'));
-const ReconciliationView = lazy(() => import('./components/ReconciliationView'));
+const PlayaView          = lazy(() => import('./components/PlayaView'));
+const ShopView           = lazy(() => import('./components/ShopView'));
 const CardPaymentsView   = lazy(() => import('./components/CardPaymentsView'));
 const AnalyticsDashboard = lazy(() => import('./components/AnalyticsDashboard'));
 const AdminSettings      = lazy(() => import('./components/AdminSettings'));
 const StationCard        = lazy(() => import('./components/StationCard'));
 
-const VALID_VIEWS: ViewState[] = ['MAP', 'STATIONS', 'SALES', 'TANKS', 'ALERTS', 'RECONCILIATION', 'ACCOUNTS', 'ANALYTICS', 'SETTINGS'];
+const VALID_VIEWS: ViewState[] = ['MAP', 'STATIONS', 'SALES', 'TANKS', 'ALERTS', 'PLAYA', 'SHOP', 'ACCOUNTS', 'ANALYTICS', 'SETTINGS'];
 
 const LoadingFallback = () => (
   <div className="flex items-center justify-center h-full">
@@ -55,10 +56,11 @@ const Dashboard: React.FC = () => {
   const [currentView, setCurrentView]         = useState<ViewState>('MAP');
   const [isSidebarOpen, setIsSidebarOpen]     = useState(false);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
+  const [activeStationId, setActiveStationId] = useState<string | null>(null);
   const [mapFlyTo, setMapFlyTo]               = useState<[number, number] | undefined>(undefined);
 
   const { isLoading, refreshData, unresolvedAlertCount, criticalAlertCount } = useDataContext();
-  const { stations, saveStation, deactivateStation } = useStations();
+  const { stations, saveStation, deactivateStation, deleteStation } = useStations();
   const { employees } = useEmployees();
   const { salesTransactions }                           = useSalesTransactions();
   const { dailyClosings, addNotes, discrepancyCount }   = useDailyClosings();
@@ -285,7 +287,7 @@ const Dashboard: React.FC = () => {
               <MapBoard
                 stations={stations}
                 selectedStation={selectedStation}
-                onStationSelect={setSelectedStation}
+                onStationSelect={(s) => { setSelectedStation(s); if (s) setActiveStationId(s.id); }}
                 flyToCenter={mapFlyTo}
               />
             </>
@@ -314,7 +316,9 @@ const Dashboard: React.FC = () => {
                 alerts={alerts}
                 onSaveStation={saveStation}
                 onDeactivateStation={deactivateStation}
+                onDeleteStation={deleteStation}
                 onViewOnMap={(station) => { setSelectedStation(station); setCurrentView('MAP'); }}
+                currentUser={currentUser}
               />
             </Suspense>
           )}
@@ -326,6 +330,8 @@ const Dashboard: React.FC = () => {
                 stations={stations}
                 salesTransactions={salesTransactions}
                 currentUser={currentUser}
+                activeStationId={activeStationId}
+                onStationChange={setActiveStationId}
               />
             </Suspense>
           )}
@@ -336,6 +342,8 @@ const Dashboard: React.FC = () => {
               <TankLevelsView
                 stations={stations}
                 currentUser={currentUser}
+                activeStationId={activeStationId}
+                onStationChange={setActiveStationId}
               />
             </Suspense>
           )}
@@ -348,19 +356,34 @@ const Dashboard: React.FC = () => {
                 stations={stations}
                 onResolveAlert={resolveAlert}
                 currentUser={currentUser}
+                activeStationId={activeStationId}
+                onStationChange={setActiveStationId}
               />
             </Suspense>
           )}
 
-          {/* RECONCILIATION */}
-          {currentView === 'RECONCILIATION' && (
+          {/* PLAYA (Forecourt totals from P*.TXT) */}
+          {currentView === 'PLAYA' && (
             <Suspense fallback={<LoadingFallback />}>
-              <ReconciliationView
+              <PlayaView
                 stations={stations}
                 dailyClosings={dailyClosings}
-                alerts={alerts}
-                onAddNotes={addNotes}
                 currentUser={currentUser}
+                activeStationId={activeStationId}
+                onStationChange={setActiveStationId}
+              />
+            </Suspense>
+          )}
+
+          {/* SHOP (Mini Mercado totals from S*.TXT) */}
+          {currentView === 'SHOP' && (
+            <Suspense fallback={<LoadingFallback />}>
+              <ShopView
+                stations={stations}
+                dailyClosings={dailyClosings}
+                currentUser={currentUser}
+                activeStationId={activeStationId}
+                onStationChange={setActiveStationId}
               />
             </Suspense>
           )}
@@ -371,6 +394,8 @@ const Dashboard: React.FC = () => {
               <CardPaymentsView
                 stations={stations}
                 currentUser={currentUser}
+                activeStationId={activeStationId}
+                onStationChange={setActiveStationId}
               />
             </Suspense>
           )}
