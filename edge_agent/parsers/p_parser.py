@@ -108,7 +108,6 @@ class PParser(BaseParser):
         record = {
             "id":                str(uuid.uuid4()),
             "station_id":        self.station_id,
-            "file_name":         self.file_name,
             "shift_date":        shift_date,
             "forecourt_total":   str(forecourt_total) if forecourt_total is not None else None,
             "p_file_name":       self.file_name,

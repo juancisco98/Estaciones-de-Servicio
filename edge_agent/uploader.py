@@ -105,6 +105,24 @@ class SupabaseUploader:
         # Strip internal metadata fields
         clean_records = [_strip_meta(r) for r in result.records]
 
+        # Deduplicar por on_conflict keys para evitar error 21000
+        # (misma raw_line repetida en el mismo archivo)
+        conflict_cols = on_conflict.split(",")
+        seen = set()
+        unique_records = []
+        for r in clean_records:
+            key = tuple(str(r.get(c, "")) for c in conflict_cols)
+            if key not in seen:
+                seen.add(key)
+                unique_records.append(r)
+        if len(unique_records) < len(clean_records):
+            logger.info(
+                "%s: %d duplicados removidos (%d -> %d records)",
+                result.file_name, len(clean_records) - len(unique_records),
+                len(clean_records), len(unique_records),
+            )
+        clean_records = unique_records
+
         logger.info(
             "Uploading %d records from %s -> table=%s",
             len(clean_records), result.file_name, table,

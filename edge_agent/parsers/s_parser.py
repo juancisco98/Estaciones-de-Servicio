@@ -99,7 +99,6 @@ class SParser(BaseParser):
         record = {
             "id":              str(uuid.uuid4()),
             "station_id":      self.station_id,
-            "file_name":       self.file_name,
             "shift_date":      shift_date,
             "shop_total":      str(shop_total) if shop_total is not None else None,
             "s_file_name":     self.file_name,
