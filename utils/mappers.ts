@@ -312,7 +312,7 @@ export const notificationToDb = (n: AppNotification): Record<string, unknown> =>
 // ─── STATION KNOWLEDGE ────────────────────────────────────────────────────────
 
 export const dbToStationKnowledge = (row: DbStationKnowledgeRow): StationKnowledge => {
-  const blob = row.knowledge_blob ?? {};
+  const blob = row.knowledge_blob ?? {} as Partial<DbStationKnowledgeRow['knowledge_blob']>;
   return {
     id:        row.id,
     stationId: row.station_id,

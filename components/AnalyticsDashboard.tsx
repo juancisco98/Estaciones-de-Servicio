@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { BarChart3, TrendingUp, Fuel, DollarSign, Gauge } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area, PieChart, Pie, Cell } from 'recharts';
 import { useTheme } from '../context/ThemeContext';
 import { Station, StationMetrics, StationDayMetrics, NetworkSummary, PeriodSummary } from '../types';
 
@@ -73,6 +73,16 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         .filter(m => m.totalRevenue > 0)
         .slice(0, 10)
         .map(m => ({ name: m.stationName.slice(0, 12), revenue: m.totalRevenue, liters: m.fuelLiters }));
+
+    const PIE_COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#06b6d4'];
+    const pieData = [
+        { name: 'Efectivo', value: networkSummary.totalCash },
+        { name: 'Tarjeta', value: networkSummary.totalCard },
+        { name: 'Cta. Corriente', value: networkSummary.totalAccount },
+        { name: 'Digital (QR)', value: networkSummary.totalDigital },
+    ].filter(d => d.value > 0);
+
+    const multiStation = barChartData.length >= 3;
 
     const periodLabel = period === 'today' ? 'Hoy'
         : period === 'week'  ? 'Últimos 7 días'
@@ -161,11 +171,58 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                     </div>
                 </div>
 
-                {/* Revenue bar chart */}
-                {barChartData.length > 0 && (
+                {/* Payment method pie chart */}
+                {pieData.length > 0 && (
                     <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-white/80 dark:border-white/8"
                     style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.03), 0 4px 12px rgba(0,0,0,0.07), 0 8px 24px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.80)' }}>
-                        <h3 className="text-sm font-bold text-gray-700 dark:text-slate-300 mb-4">Ventas por estación</h3>
+                        <h3 className="text-sm font-bold text-gray-700 dark:text-slate-300 mb-4">Distribucion por metodo de pago</h3>
+                        <div className="flex flex-col sm:flex-row items-center gap-6">
+                            <ResponsiveContainer width={200} height={200}>
+                                <PieChart>
+                                    <Pie
+                                        data={pieData}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={50}
+                                        outerRadius={85}
+                                        paddingAngle={3}
+                                        dataKey="value"
+                                        stroke="none"
+                                    >
+                                        {pieData.map((_, i) => (
+                                            <Cell key={i} fill={PIE_COLORS[['Efectivo', 'Tarjeta', 'Cta. Corriente', 'Digital (QR)'].indexOf(pieData[i].name)] ?? PIE_COLORS[0]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip
+                                        formatter={(value: number) => [fmt(value)]}
+                                        contentStyle={{ borderRadius: '12px', border: `1px solid ${tooltipBorder}`, boxShadow: '0 4px 24px rgba(0,0,0,0.12)', backgroundColor: tooltipBg, color: isDark ? '#e2e8f0' : '#111827' }}
+                                    />
+                                </PieChart>
+                            </ResponsiveContainer>
+                            <div className="flex-1 space-y-2">
+                                {pieData.map((d, i) => {
+                                    const total = pieData.reduce((s, x) => s + x.value, 0);
+                                    const pct = total > 0 ? ((d.value / total) * 100).toFixed(1) : '0';
+                                    const colorIdx = ['Efectivo', 'Tarjeta', 'Cta. Corriente', 'Digital (QR)'].indexOf(d.name);
+                                    return (
+                                        <div key={d.name} className="flex items-center gap-3">
+                                            <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[colorIdx] ?? PIE_COLORS[0] }} />
+                                            <span className="text-sm text-gray-600 dark:text-slate-300 flex-1">{d.name}</span>
+                                            <span className="text-sm font-bold text-gray-900 dark:text-white">{fmt(d.value)}</span>
+                                            <span className="text-xs text-gray-400 dark:text-slate-500 w-12 text-right">{pct}%</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Revenue bar chart — only with 3+ stations */}
+                {multiStation && barChartData.length > 0 && (
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-white/80 dark:border-white/8"
+                    style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.03), 0 4px 12px rgba(0,0,0,0.07), 0 8px 24px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.80)' }}>
+                        <h3 className="text-sm font-bold text-gray-700 dark:text-slate-300 mb-4">Ventas por estacion</h3>
                         <ResponsiveContainer width="100%" height={200}>
                             <BarChart data={barChartData} margin={{ top: 0, right: 0, left: -15, bottom: 0 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
@@ -185,8 +242,8 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                 {timeSeries.length > 0 && (
                     <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-white/80 dark:border-white/8"
                     style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.03), 0 4px 12px rgba(0,0,0,0.07), 0 8px 24px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.80)' }}>
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-sm font-bold text-gray-700 dark:text-slate-300">Evolución diaria</h3>
+                        <div className="flex items-center justify-between mb-1">
+                            <h3 className="text-sm font-bold text-gray-700 dark:text-slate-300">Evolucion diaria</h3>
                             <select
                                 value={chartStationId}
                                 onChange={e => setSelectedStationId(e.target.value)}
@@ -197,7 +254,8 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                                 ))}
                             </select>
                         </div>
-                        <ResponsiveContainer width="100%" height={180}>
+                        <p className="text-xs text-gray-400 dark:text-slate-500 mb-4">Ventas diarias en pesos</p>
+                        <ResponsiveContainer width="100%" height={200}>
                             <AreaChart data={timeSeries} margin={{ top: 0, right: 0, left: -15, bottom: 0 }}>
                                 <defs>
                                     <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
@@ -206,23 +264,24 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                                     </linearGradient>
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                                <XAxis dataKey="date" tick={{ fontSize: 10, fill: tickColor }} tickFormatter={d => d.slice(5)} />
+                                <XAxis dataKey="date" tick={{ fontSize: 10, fill: tickColor }} tickFormatter={d => { const [, m, day] = d.split('-'); return `${day}/${m}`; }} />
                                 <YAxis tick={{ fontSize: 10, fill: tickColor }} tickFormatter={v => `$${(v / 1000).toFixed(0)}K`} />
                                 <Tooltip
+                                    labelFormatter={d => { const [, m, day] = String(d).split('-'); return `${day}/${m}`; }}
                                     formatter={(value: number, name: string) => [
                                         name === 'totalRevenue' ? fmt(value) : `${value.toLocaleString('es-AR')} L`,
                                         name === 'totalRevenue' ? 'Ventas' : 'Combustible',
                                     ]}
                                     contentStyle={{ borderRadius: '12px', border: `1px solid ${tooltipBorder}`, boxShadow: '0 4px 24px rgba(0,0,0,0.12)', backgroundColor: tooltipBg, color: isDark ? '#e2e8f0' : '#111827' }}
                                 />
-                                <Area type="monotone" dataKey="totalRevenue" stroke="#f59e0b" fill="url(#revenueGrad)" strokeWidth={2} dot={false} />
+                                <Area type="monotone" dataKey="totalRevenue" stroke="#f59e0b" fill="url(#revenueGrad)" strokeWidth={2} dot={timeSeries.length <= 14} />
                             </AreaChart>
                         </ResponsiveContainer>
                     </div>
                 )}
 
-                {/* Station ranking table */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-white/80 dark:border-white/8"
+                {/* Station ranking table — only with multiple stations */}
+                {multiStation && <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-white/80 dark:border-white/8"
                     style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.03), 0 4px 12px rgba(0,0,0,0.07), 0 8px 24px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.80)' }}>
                     <h3 className="text-sm font-bold text-gray-700 dark:text-slate-300 mb-4">Ranking de estaciones</h3>
                     <div className="overflow-x-auto">
@@ -268,7 +327,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                             </tbody>
                         </table>
                     </div>
-                </div>
+                </div>}
             </div>
         </div>
     );

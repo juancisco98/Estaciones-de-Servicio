@@ -29,13 +29,13 @@ export const useTankLevels = () => {
     /** Returns tanks below warning threshold. Used for alert badge on MapBoard. */
     const getLowTanks = useCallback((stationId: string): TankLevel[] => {
         const latest = getLatestByStation(stationId);
-        return Array.from(latest.values()).filter(t => t.levelLiters < TANK_WARNING_LITERS);
+        return [...latest.values()].filter(t => t.levelLiters < TANK_WARNING_LITERS);
     }, [getLatestByStation]);
 
     /** Returns tanks below critical threshold. */
     const getCriticalTanks = useCallback((stationId: string): TankLevel[] => {
         const latest = getLatestByStation(stationId);
-        return Array.from(latest.values()).filter(t => t.levelLiters < TANK_CRITICAL_LITERS);
+        return [...latest.values()].filter(t => t.levelLiters < TANK_CRITICAL_LITERS);
     }, [getLatestByStation]);
 
     /** Alert level for a given tank reading. */
@@ -48,7 +48,7 @@ export const useTankLevels = () => {
     /** Aggregated stock across all tanks of a station (liters). */
     const getTotalStock = useCallback((stationId: string): number => {
         const latest = getLatestByStation(stationId);
-        return Array.from(latest.values()).reduce((sum, t) => sum + t.levelLiters, 0);
+        return [...latest.values()].reduce((sum, t) => sum + t.levelLiters, 0);
     }, [getLatestByStation]);
 
     return {

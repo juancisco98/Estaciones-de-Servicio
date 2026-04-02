@@ -11,7 +11,7 @@ import {
   classifyAccount,
   ClassifyProductPayload,
 } from '../services/knowledgeService';
-import type { StationKnowledge, ProductType } from '../types';
+import type { StationKnowledge, ProductType, KnowledgeProduct } from '../types';
 
 interface KnowledgePanelSectionProps {
   stations: Station[];
@@ -339,7 +339,7 @@ const KnowledgePanelSection: React.FC<KnowledgePanelSectionProps> = ({ stations,
                         <span className="ml-1 hidden group-open:inline">▾</span>
                       </summary>
                       <div className="mt-2 space-y-1">
-                        {Object.entries(products).map(([code, product]) => {
+                        {Object.entries(products).map(([code, product]: [string, KnowledgeProduct]) => {
                           const color = PRODUCT_TYPE_COLORS[product.productType] ?? 'gray';
                           return (
                             <div key={code} className="flex items-center gap-2 text-[10px]">

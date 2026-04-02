@@ -134,9 +134,9 @@ const LiveDashboardView: React.FC<LiveDashboardViewProps> = ({
 
     const unresolvedAlerts  = alerts.filter(a => !a.resolved);
     const criticalAlerts    = unresolvedAlerts.filter(a => a.level === 'CRITICAL');
-    const totalRevenue      = Array.from(metricsMap.values()).reduce((s, m) => s + m.totalRevenue, 0);
-    const totalFuelLiters   = Array.from(metricsMap.values()).reduce((s, m) => s + m.fuelLiters, 0);
-    const totalTransactions = Array.from(metricsMap.values()).reduce((s, m) => s + m.totalTransactions, 0);
+    const totalRevenue      = [...metricsMap.values()].reduce((s, m) => s + m.totalRevenue, 0);
+    const totalFuelLiters   = [...metricsMap.values()].reduce((s, m) => s + m.fuelLiters, 0);
+    const totalTransactions = [...metricsMap.values()].reduce((s, m) => s + m.totalTransactions, 0);
     const discrepancies     = dailyClosings.filter(c => c.status === 'DISCREPANCY').length;
 
     const sortedStations = useMemo(() => [...activeStations].sort((a, b) => {
