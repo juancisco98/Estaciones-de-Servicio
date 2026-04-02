@@ -227,7 +227,7 @@ supabase:
   service_key_env: "SUPABASE_SERVICE_KEY"
 
 watcher:
-  watch_path: "C:\SVAPP"
+  watch_path: 'C:\SVAPP'
   watched_extensions:
     - ".txt"
     - ".TXT"
@@ -245,14 +245,14 @@ alerts:
 
 logging:
   level: "INFO"
-  log_file: "logs\edge_agent.log"
+  log_file: 'logs\edge_agent.log'
   max_bytes: 10485760
   backup_count: 5
 
 retry:
   attempts: 3
   wait_seconds: 5
-  dead_letter_path: "logs\dead_letter\"
+  dead_letter_path: 'logs\dead_letter\'
 "@
 
 Set-Content -Path "$INSTALL_DIR\config.yaml" -Value $configContent
