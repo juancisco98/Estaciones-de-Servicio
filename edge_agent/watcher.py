@@ -210,11 +210,11 @@ def process_file(
 
     if success:
         logger.info(
-            "✓ %s: %d/%d lines → Supabase (%d errors)",
+            "%s: %d/%d lines -> Supabase (%d errors)",
             result.file_name, result.lines_ok, result.lines_parsed, len(result.errors),
         )
     else:
-        logger.error("✗ %s: upload failed — written to dead letter queue", result.file_name)
+        logger.error("FAIL %s: upload failed - written to dead letter queue", result.file_name)
 
 
 # ─── Watchdog event handler ───────────────────────────────────────────────────
@@ -340,7 +340,17 @@ def main(config_path: Path = _DEFAULT_CONFIG, stop_event: Event | None = None) -
         debounce_seconds=debounce,
     )
     observer.schedule(handler, str(watch_root), recursive=False)
-    logger.info("Watching %s → station_id=%s", watch_root, station_id[:8])
+
+    # Escaneo inicial: procesar archivos .TXT existentes que no fueron procesados
+    import glob
+    existing = glob.glob(str(watch_root / "*.TXT")) + glob.glob(str(watch_root / "*.txt"))
+    if existing:
+        logger.info("Escaneo inicial: %d archivos TXT encontrados en %s", len(existing), watch_root)
+        for fpath in sorted(existing):
+            process_file(fpath, station_id, state, uploader)
+        logger.info("Escaneo inicial completo.")
+    else:
+        logger.info("No hay archivos TXT existentes en %s", watch_root)
 
     observer.start()
     logger.info("Watching %s for station %s", watch_root, station_id[:8])

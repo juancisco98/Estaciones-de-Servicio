@@ -106,7 +106,7 @@ class SupabaseUploader:
         clean_records = [_strip_meta(r) for r in result.records]
 
         logger.info(
-            "Uploading %d records from %s → table=%s",
+            "Uploading %d records from %s -> table=%s",
             len(clean_records), result.file_name, table,
         )
 
@@ -114,7 +114,7 @@ class SupabaseUploader:
 
         if success:
             logger.info(
-                "✓ %s: %d records uploaded to %s", result.file_name, len(clean_records), table
+                "%s: %d records uploaded to %s", result.file_name, len(clean_records), table
             )
             shift_date = result.records[0].get("shift_date") if result.records else None
             if shift_date:
@@ -164,7 +164,7 @@ class SupabaseUploader:
                 return True
             # 409 Conflict with merge-duplicates should not happen, but handle gracefully
             logger.error(
-                "Supabase error %d for %s → %s: %s",
+                "Supabase error %d for %s -> %s: %s",
                 resp.status_code, source_file, table, resp.text[:500],
             )
             return False

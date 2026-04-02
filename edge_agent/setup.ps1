@@ -315,28 +315,33 @@ if (($testResult -join " ") -notmatch "VERIFICACION_OK") {
 }
 Write-Host "  OK: Verificacion completa" -ForegroundColor Green
 
-# 6d. Registrar el servicio Windows
+# 6d. Detener y eliminar servicio anterior si existe
+sc.exe stop StationOSEdgeAgent 2>$null | Out-Null
+Start-Sleep -Seconds 2
+sc.exe delete StationOSEdgeAgent 2>$null | Out-Null
+Start-Sleep -Seconds 1
+
+# 6e. Registrar el servicio Windows
 try {
     Push-Location $INSTALL_DIR
     python service.py install 2>$null
     Pop-Location
     Write-Host "  OK: Servicio registrado" -ForegroundColor Green
 } catch {
-    Write-Host "  ERROR: No se pudo registrar el servicio: $_" -ForegroundColor Red
-    Read-Host "Presiona Enter para cerrar"
-    exit 1
+    Write-Host "  WARN: No se pudo registrar servicio Windows: $_" -ForegroundColor Yellow
+    Write-Host "  Los datos se procesaran con scan.bat en su lugar." -ForegroundColor Yellow
 }
 
-# 6e. Configurar arranque automatico y recuperacion ante fallos
+# 6f. Configurar arranque automatico y recuperacion ante fallos
 sc.exe config StationOSEdgeAgent start= auto 2>$null | Out-Null
 sc.exe failure StationOSEdgeAgent reset= 86400 actions= restart/60000/restart/60000/restart/120000 2>$null | Out-Null
 
-# 6f. Iniciar el servicio
+# 6g. Iniciar el servicio
 Write-Host "  Iniciando servicio..." -ForegroundColor Gray
 sc.exe start StationOSEdgeAgent 2>$null | Out-Null
 Start-Sleep -Seconds 4
 
-# 6g. Verificar que quedo corriendo
+# 6h. Verificar que quedo corriendo
 $svcState = sc.exe query StationOSEdgeAgent 2>&1 | Select-String "STATE"
 if ($svcState -match "RUNNING") {
     Write-Host "  OK: Servicio corriendo" -ForegroundColor Green
