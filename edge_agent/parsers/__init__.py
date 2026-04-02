@@ -32,6 +32,7 @@ __all__ = [
 FILE_PREFIX_MAP: dict[str, type[BaseParser]] = {
     "VE": VEParser,
     "C":  CParser,
+    "TQ": TParser,  # TQ prefix must come before T to match TQ120336 correctly
     "T":  TParser,
     "P":  PParser,
     "S":  SParser,

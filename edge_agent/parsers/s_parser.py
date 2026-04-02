@@ -106,7 +106,6 @@ class SParser(BaseParser):
             "_totals_snapshot": totals,
             "_turno":          turno,
             "_salon":          salon,
-            "raw_line":        f"[{len(totals)} lines from {self.file_name}]",
         }
 
         result.records.append(record)

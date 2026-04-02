@@ -106,14 +106,12 @@ class TParser(BaseParser):
                 continue
 
             tank_id = f"TQ{tank_num_str}"
-            shift_date = recorded_at[:10]
 
             record = {
                 "id":                  str(uuid.uuid4()),
                 "station_id":          self.station_id,
                 "file_name":           self.file_name,
                 "recorded_at":         recorded_at,
-                "shift_date":          shift_date,
                 "tank_id":             tank_id,
                 "product_name":        product_name.strip(),
                 "product_code":        product_name.strip().upper().replace(" ", "_"),

@@ -344,7 +344,7 @@ def main(config_path: Path = _DEFAULT_CONFIG, stop_event: Event | None = None) -
 
     # Escaneo inicial: procesar archivos .TXT existentes que no fueron procesados
     import glob
-    existing = glob.glob(str(watch_root / "*.TXT")) + glob.glob(str(watch_root / "*.txt"))
+    existing = list(set(glob.glob(str(watch_root / "*.TXT")) + glob.glob(str(watch_root / "*.txt"))))
     if existing:
         logger.info("Escaneo inicial: %d archivos TXT encontrados en %s", len(existing), watch_root)
         for fpath in sorted(existing):

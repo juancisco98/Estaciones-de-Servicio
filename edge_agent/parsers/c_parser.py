@@ -134,8 +134,11 @@ class CParser(BaseParser):
                     f"(code {account_code})"
                 )
 
-            # Shift date extracted from filename (C300389 → date 30/03, shift 89)
+            # Shift date extracted from filename (C300389 -> date 30/03, shift 89)
             shift_date = self._extract_shift_date_from_filename()
+            if not shift_date:
+                from datetime import date as _date
+                shift_date = _date.today().isoformat()
 
             record = {
                 "id":             str(uuid.uuid4()),

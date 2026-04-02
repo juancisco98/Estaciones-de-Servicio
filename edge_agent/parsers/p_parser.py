@@ -116,7 +116,6 @@ class PParser(BaseParser):
             "_totals_snapshot":  totals,
             "_turno":            turno,
             "_playa":            playa,
-            "raw_line":          f"[{len(totals)} lines from {self.file_name}]",
         }
 
         result.records.append(record)
