@@ -190,7 +190,7 @@ def process_file(
         result = parser.parse()
     except Exception as exc:
         logger.error("Parser crashed on %s: %s", file_path, exc, exc_info=True)
-        state.mark_processed(file_path, file_md5, 0, [str(exc)])
+        # NO marcar como procesado — se reintentara en el proximo scan
         return
 
     # Log parse errors (anomalies, corrupt lines) — do not abort upload

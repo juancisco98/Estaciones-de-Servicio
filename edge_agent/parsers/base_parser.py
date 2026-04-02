@@ -187,11 +187,14 @@ class BaseParser(ABC):
     def _extract_shift_date_from_filename(self) -> str | None:
         """
         Try to extract a date from the filename.
-        e.g. "VE20260330.TXT" → "2026-03-30"
-             "VE2026033014.TXT" → "2026-03-30"
+        Supports multiple VB naming conventions:
+          "VE20260330.TXT"  → "2026-03-30"  (YYYYMMDD)
+          "VE30032026.TXT"  → "2026-03-30"  (DDMMYYYY)
+          "C250374.TXT"     → "2026-03-25"  (DDMM + turno, year from file mtime)
+          "P310393.TXT"     → "2026-03-31"  (DDMM + turno, year from file mtime)
         Returns None if no date found in filename.
         """
-        # Try YYYYMMDD pattern in filename
+        # Try YYYYMMDD pattern in filename (8 consecutive digits)
         match = re.search(r'(\d{4})(\d{2})(\d{2})', self.file_name)
         if match:
             try:
@@ -199,13 +202,25 @@ class BaseParser(ABC):
                 return d.isoformat()
             except ValueError:
                 pass
-        # Try DDMMYYYY pattern
+        # Try DDMMYYYY pattern (8 consecutive digits)
         match = re.search(r'(\d{2})(\d{2})(\d{4})', self.file_name)
         if match:
             try:
                 d = date(int(match.group(3)), int(match.group(2)), int(match.group(1)))
                 return d.isoformat()
             except ValueError:
+                pass
+        # Try DDMM + turno pattern (C/P/S/T files like C250374.TXT)
+        # Extract first 4 digits after prefix letters as DDMM, year from file mtime
+        name_no_ext = os.path.splitext(self.file_name)[0].upper()
+        digits = re.sub(r'^[A-Z]+', '', name_no_ext)
+        if len(digits) >= 4:
+            try:
+                dd, mm = int(digits[:2]), int(digits[2:4])
+                year = datetime.fromtimestamp(os.path.getmtime(self.file_path)).year
+                d = date(year, mm, dd)
+                return d.isoformat()
+            except (ValueError, OSError):
                 pass
         return None
 
