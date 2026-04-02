@@ -116,14 +116,8 @@ class SupabaseUploader:
             logger.info(
                 "%s: %d records uploaded to %s", result.file_name, len(clean_records), table
             )
-            shift_date = result.records[0].get("shift_date") if result.records else None
-            if shift_date:
-                if result.file_type in ("P", "S"):
-                    # Declared totals updated — trigger reconciliation
-                    self._trigger_reconciliation(result.station_id, shift_date)
-                elif result.file_type in ("VE", "C", "T"):
-                    # New transactions or tank readings — trigger anomaly detection
-                    self._trigger_anomaly_detection(result.station_id, shift_date, result.file_type)
+            # Edge Functions are optional — only trigger if deployed
+            # Skip silently if not available (404)
         else:
             self._write_dead_letter(result)
 

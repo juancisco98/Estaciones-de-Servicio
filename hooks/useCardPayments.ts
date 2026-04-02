@@ -1,27 +1,14 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 import { CardPayment, PaymentMethod } from '../types';
 import { useDataContext } from '../context/DataContext';
 
 export const useCardPayments = () => {
-    const { cardPayments, dailyClosings } = useDataContext();
-
-    // Only show payments for shifts that have a daily_closing (P/S files arrived)
-    const closedShiftKeys = useMemo(() => {
-        const keys = new Set<string>();
-        for (const c of dailyClosings) {
-            keys.add(`${c.stationId}::${c.shiftDate}`);
-        }
-        return keys;
-    }, [dailyClosings]);
-
-    const closedCardPayments = useMemo(() =>
-        cardPayments.filter(p => p.shiftDate && closedShiftKeys.has(`${p.stationId}::${p.shiftDate}`)),
-    [cardPayments, closedShiftKeys]);
+    const { cardPayments } = useDataContext();
 
     /** All payments for a given station. */
     const getByStation = useCallback((stationId: string): CardPayment[] =>
-        closedCardPayments.filter(p => p.stationId === stationId),
-    [closedCardPayments]);
+        cardPayments.filter(p => p.stationId === stationId),
+    [cardPayments]);
 
     /** Payments for a date range (inclusive). */
     const getByDateRange = useCallback((
@@ -29,18 +16,18 @@ export const useCardPayments = () => {
         to: string,
         stationId?: string | null,
     ): CardPayment[] =>
-        closedCardPayments.filter(p =>
+        cardPayments.filter(p =>
             p.shiftDate &&
             p.shiftDate >= from &&
             p.shiftDate <= to &&
             (!stationId || p.stationId === stationId)
         ),
-    [closedCardPayments]);
+    [cardPayments]);
 
     /** Filter by payment type. */
     const getByPaymentType = useCallback((type: PaymentMethod): CardPayment[] =>
-        closedCardPayments.filter(p => p.paymentType === type),
-    [closedCardPayments]);
+        cardPayments.filter(p => p.paymentType === type),
+    [cardPayments]);
 
     /** Group by payment type for a date range. */
     const getPaymentTypeBreakdown = useCallback((
@@ -67,7 +54,7 @@ export const useCardPayments = () => {
     }, [getByDateRange]);
 
     return {
-        cardPayments: closedCardPayments,
+        cardPayments: cardPayments,
         getByStation,
         getByDateRange,
         getByPaymentType,
