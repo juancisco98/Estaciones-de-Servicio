@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Fuel, Search, ChevronDown, ChevronUp, Droplets } from 'lucide-react';
+import { Fuel, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { Station, DailyClosing, SalesTransaction, User } from '../types';
 import StationFilter from './StationFilter';
 
@@ -26,47 +26,49 @@ interface ProductGroup {
 }
 
 const DayBreakdown: React.FC<{ transactions: SalesTransaction[] }> = ({ transactions }) => {
-    const { combustibles, varios } = useMemo(() => {
+    const { combustibles, totalVarios } = useMemo(() => {
         const fuelMap = new Map<string, ProductGroup>();
-        const variosMap = new Map<string, ProductGroup>();
+        let varios = 0;
 
         for (const t of transactions) {
             const isFuel = Number(t.productCode) <= MAX_FUEL_CODE && Number(t.productCode) > 0;
-            const map = isFuel ? fuelMap : variosMap;
-            const key = t.productName;
-            const existing = map.get(key);
-            if (existing) {
-                existing.totalAmount += t.totalAmount;
-                existing.totalQuantity += t.quantity;
-                existing.count += 1;
+            if (isFuel) {
+                const key = t.productName;
+                const existing = fuelMap.get(key);
+                if (existing) {
+                    existing.totalAmount += t.totalAmount;
+                    existing.totalQuantity += t.quantity;
+                    existing.count += 1;
+                } else {
+                    fuelMap.set(key, {
+                        productName: t.productName,
+                        productCode: t.productCode,
+                        totalAmount: t.totalAmount,
+                        totalQuantity: t.quantity,
+                        count: 1,
+                    });
+                }
             } else {
-                map.set(key, {
-                    productName: t.productName,
-                    productCode: t.productCode,
-                    totalAmount: t.totalAmount,
-                    totalQuantity: t.quantity,
-                    count: 1,
-                });
+                varios += t.totalAmount;
             }
         }
 
         return {
             combustibles: Array.from(fuelMap.values()).sort((a, b) => b.totalAmount - a.totalAmount),
-            varios: Array.from(variosMap.values()).sort((a, b) => b.totalAmount - a.totalAmount),
+            totalVarios: varios,
         };
     }, [transactions]);
 
     const totalCombustibles = combustibles.reduce((s, p) => s + p.totalAmount, 0);
-    const totalVarios = varios.reduce((s, p) => s + p.totalAmount, 0);
 
     return (
-        <div className="border-t border-gray-100 dark:border-white/5 px-5 py-4 space-y-4">
+        <div className="border-t border-gray-100 dark:border-white/5 px-5 py-4 space-y-3">
             {combustibles.length > 0 && (
                 <div>
                     <div className="flex items-center gap-2 mb-2">
                         <Fuel className="w-4 h-4 text-amber-500" />
-                        <span className="text-xs font-bold text-amber-600 dark:text-amber-400">Combustibles</span>
-                        <span className="text-xs text-gray-400 ml-auto">{fmt(totalCombustibles)}</span>
+                        <span className="text-xs font-bold text-amber-600 dark:text-amber-400">VENTAS DE COMBUSTIBLES</span>
+                        <span className="text-xs font-bold text-gray-900 dark:text-white ml-auto">{fmt(totalCombustibles)}</span>
                     </div>
                     <div className="space-y-1">
                         {combustibles.map(p => (
@@ -80,26 +82,14 @@ const DayBreakdown: React.FC<{ transactions: SalesTransaction[] }> = ({ transact
                 </div>
             )}
 
-            {varios.length > 0 && (
-                <div>
-                    <div className="flex items-center gap-2 mb-2">
-                        <Droplets className="w-4 h-4 text-teal-500" />
-                        <span className="text-xs font-bold text-teal-600 dark:text-teal-400">Varios (aceites, lubricantes, etc.)</span>
-                        <span className="text-xs text-gray-400 ml-auto">{fmt(totalVarios)}</span>
-                    </div>
-                    <div className="space-y-1">
-                        {varios.map(p => (
-                            <div key={p.productName} className="flex items-center text-xs px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-slate-800/50">
-                                <span className="font-medium text-gray-700 dark:text-gray-300 flex-1">{p.productName}</span>
-                                <span className="text-gray-400 dark:text-slate-500 mr-4">x{p.count}</span>
-                                <span className="font-bold text-gray-900 dark:text-white w-24 text-right">{fmt(p.totalAmount)}</span>
-                            </div>
-                        ))}
-                    </div>
+            {totalVarios > 0 && (
+                <div className="flex items-center text-xs px-3 py-2.5 rounded-lg bg-teal-50 dark:bg-teal-500/10">
+                    <span className="font-bold text-teal-700 dark:text-teal-400 flex-1">VENTAS DE VARIOS</span>
+                    <span className="font-bold text-gray-900 dark:text-white w-24 text-right">{fmt(totalVarios)}</span>
                 </div>
             )}
 
-            {combustibles.length === 0 && varios.length === 0 && (
+            {combustibles.length === 0 && totalVarios === 0 && (
                 <p className="text-xs text-gray-400 dark:text-slate-500 text-center py-2">Sin ventas detalladas para este dia</p>
             )}
         </div>
