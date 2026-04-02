@@ -134,9 +134,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     .gte('shift_date', dateCutoffDate)
                     .order('shift_date', { ascending: false }),
                 supabase.from('tank_levels').select('*')
-                    .gte('recorded_at', dateCutoff)
                     .order('recorded_at', { ascending: false })
-                    .limit(500),
+                    .limit(1000),
                 supabase.from('alerts').select('*')
                     .eq('resolved', false)
                     .order('created_at', { ascending: false })
