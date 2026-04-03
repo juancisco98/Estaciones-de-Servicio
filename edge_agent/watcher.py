@@ -49,6 +49,7 @@ import logging.handlers
 import os
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from threading import Event, Lock, Timer
 from typing import Any
@@ -117,7 +118,7 @@ class StateManager:
         records_inserted: int,
         errors: list[str],
     ) -> None:
-        from datetime import datetime
+
         with self._lock:
             self._state[file_path] = {
                 "md5":              md5,
@@ -158,17 +159,31 @@ def process_file(
     station_id: str,
     state: StateManager,
     uploader: SupabaseUploader,
+    max_file_bytes: int = 50 * 1024 * 1024,
 ) -> None:
     """
     Full pipeline for a single .TXT file:
-      1. Compute MD5 (non-destructive read)
-      2. Skip if already processed with same MD5 (idempotency)
-      3. Route to parser
-      4. Parse
-      5. Log any parse errors
-      6. Upload to Supabase
-      7. Update state.json
+      1. Check file size (reject oversized/corrupt files)
+      2. Compute MD5 (non-destructive read)
+      3. Skip if already processed with same MD5 (idempotency)
+      4. Route to parser
+      5. Parse
+      6. Log any parse errors
+      7. Upload to Supabase
+      8. Update state.json
     """
+    # Size guard: reject files larger than configured max
+    try:
+        file_size = os.path.getsize(file_path)
+        if file_size > max_file_bytes:
+            logger.error(
+                "Skipping %s: file too large (%d bytes, max %d)",
+                os.path.basename(file_path), file_size, max_file_bytes,
+            )
+            return
+    except OSError:
+        pass  # file may have been deleted, let MD5 step handle it
+
     try:
         file_md5 = _md5(file_path)
     except OSError as exc:
@@ -233,11 +248,13 @@ class TxtFileHandler(FileSystemEventHandler):
         state: StateManager,
         uploader: SupabaseUploader,
         debounce_seconds: float = 2.0,
+        max_file_bytes: int = 50 * 1024 * 1024,
     ):
         self.station_id = station_id
         self.state = state
         self.uploader = uploader
         self.debounce_seconds = debounce_seconds
+        self.max_file_bytes = max_file_bytes
         self._pending: dict[str, Timer] = {}
         self._lock = Lock()
 
@@ -253,7 +270,7 @@ class TxtFileHandler(FileSystemEventHandler):
             timer = Timer(
                 self.debounce_seconds,
                 process_file,
-                args=(file_path, self.station_id, self.state, self.uploader),
+                args=(file_path, self.station_id, self.state, self.uploader, self.max_file_bytes),
             )
             self._pending[file_path] = timer
             timer.start()
@@ -321,6 +338,7 @@ def main(config_path: Path = _DEFAULT_CONFIG, stop_event: Event | None = None) -
     watch_root = Path(config["watcher"]["watch_path"])
     station_id: str = config.get("station_id", "")
     debounce = config["watcher"].get("debounce_seconds", 2.0)
+    max_file_bytes: int = config["watcher"].get("max_file_size_bytes", 50 * 1024 * 1024)
 
     if not watch_root.exists():
         logger.critical("Watch path does not exist: %s", watch_root)
@@ -339,6 +357,7 @@ def main(config_path: Path = _DEFAULT_CONFIG, stop_event: Event | None = None) -
         state=state,
         uploader=uploader,
         debounce_seconds=debounce,
+        max_file_bytes=max_file_bytes,
     )
     observer.schedule(handler, str(watch_root), recursive=False)
 
@@ -348,7 +367,7 @@ def main(config_path: Path = _DEFAULT_CONFIG, stop_event: Event | None = None) -
     if existing:
         logger.info("Escaneo inicial: %d archivos TXT encontrados en %s", len(existing), watch_root)
         for fpath in sorted(existing):
-            process_file(fpath, station_id, state, uploader)
+            process_file(fpath, station_id, state, uploader, max_file_bytes)
         logger.info("Escaneo inicial completo.")
     else:
         logger.info("No hay archivos TXT existentes en %s", watch_root)
@@ -376,7 +395,7 @@ def main(config_path: Path = _DEFAULT_CONFIG, stop_event: Event | None = None) -
                             glob.glob(str(watch_root / "*.txt"))
                         ))
                         for fpath in sorted(scan_files):
-                            process_file(fpath, station_id, state, uploader)
+                            process_file(fpath, station_id, state, uploader, max_file_bytes)
                         uploader.update_scan_status(req_id, "completed", len(scan_files))
                         logger.info("Scan request %s completed: %d files scanned", req_id[:8], len(scan_files))
                 except Exception as exc:

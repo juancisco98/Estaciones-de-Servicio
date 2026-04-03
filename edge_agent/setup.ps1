@@ -145,40 +145,59 @@ try {
     Write-Host "  WARN: No se pudo registrar email (puede que ya exista): $_" -ForegroundColor Yellow
 }
 
-# 3b. Create station and get UUID back
+# 3b. Check if station already exists (avoid duplicates on reinstall)
+$StationUUID = $null
 try {
-    $stationHeaders = $AUTH_HEADERS.Clone()
-    $stationHeaders["Prefer"] = "return=representation"
+    $encodedName = [uri]::EscapeDataString($StationName)
+    $existingStation = Invoke-RestMethod -Uri "$SUPABASE_URL/rest/v1/stations?owner_email=eq.$($OwnerEmail.ToLower())&name=eq.$encodedName&select=id&limit=1" `
+        -Method GET -Headers $AUTH_HEADERS
 
-    $stationBody = @{
-        name        = $StationName
-        owner_email = $OwnerEmail.ToLower()
-        address     = $StationAddress
-        coordinates = @($Lat, $Lng)
-        is_active   = $true
-    } | ConvertTo-Json
-
-    $stationBodyBytes = [System.Text.Encoding]::UTF8.GetBytes($stationBody)
-    $response = Invoke-RestMethod -Uri "$SUPABASE_URL/rest/v1/stations" `
-        -Method POST -Headers $stationHeaders -Body $stationBodyBytes
-
-    # Response is an array
-    if ($response -is [System.Array]) {
-        $StationUUID = $response[0].id
-    } else {
-        $StationUUID = $response.id
+    if ($existingStation -and ($existingStation -is [System.Array]) -and $existingStation.Count -gt 0) {
+        $StationUUID = $existingStation[0].id
+        Write-Host "  OK: Estacion existente encontrada (UUID: $($StationUUID.Substring(0,8))...)" -ForegroundColor Green
+    } elseif ($existingStation -and $existingStation.id) {
+        $StationUUID = $existingStation.id
+        Write-Host "  OK: Estacion existente encontrada (UUID: $($StationUUID.Substring(0,8))...)" -ForegroundColor Green
     }
-
-    if ([string]::IsNullOrWhiteSpace($StationUUID)) {
-        throw "No se recibio UUID de la estacion"
-    }
-
-    Write-Host "  OK: Estacion creada (UUID: $($StationUUID.Substring(0,8))...)" -ForegroundColor Green
 } catch {
-    Write-Host "  ERROR: No se pudo crear la estacion: $_" -ForegroundColor Red
-    Write-Host "  Verifica la conexion a internet y que el SQL migration fue ejecutado." -ForegroundColor Yellow
-    Read-Host "Presiona Enter para cerrar"
-    exit 1
+    Write-Host "  Verificando estacion existente: no encontrada, se creara nueva." -ForegroundColor Gray
+}
+
+# 3c. Create station if it doesn't exist
+if ([string]::IsNullOrWhiteSpace($StationUUID)) {
+    try {
+        $stationHeaders = $AUTH_HEADERS.Clone()
+        $stationHeaders["Prefer"] = "return=representation"
+
+        $stationBody = @{
+            name        = $StationName
+            owner_email = $OwnerEmail.ToLower()
+            address     = $StationAddress
+            coordinates = @($Lat, $Lng)
+            is_active   = $true
+        } | ConvertTo-Json
+
+        $stationBodyBytes = [System.Text.Encoding]::UTF8.GetBytes($stationBody)
+        $response = Invoke-RestMethod -Uri "$SUPABASE_URL/rest/v1/stations" `
+            -Method POST -Headers $stationHeaders -Body $stationBodyBytes
+
+        if ($response -is [System.Array]) {
+            $StationUUID = $response[0].id
+        } else {
+            $StationUUID = $response.id
+        }
+
+        if ([string]::IsNullOrWhiteSpace($StationUUID)) {
+            throw "No se recibio UUID de la estacion"
+        }
+
+        Write-Host "  OK: Estacion creada (UUID: $($StationUUID.Substring(0,8))...)" -ForegroundColor Green
+    } catch {
+        Write-Host "  ERROR: No se pudo crear la estacion: $_" -ForegroundColor Red
+        Write-Host "  Verifica la conexion a internet y que el SQL migration fue ejecutado." -ForegroundColor Yellow
+        Read-Host "Presiona Enter para cerrar"
+        exit 1
+    }
 }
 
 # ─── Step 4: Copy Files ──────────────────────────────────────────────────────

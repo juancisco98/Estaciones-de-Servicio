@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -220,8 +221,7 @@ class SupabaseUploader:
         Write a failed upload to the dead letter directory for manual review.
         File: logs/dead_letter/<file_name>_<timestamp>.json
         """
-        from datetime import datetime
-        ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         dead_file = self.dead_letter_dir / f"{result.file_name}_{ts}.json"
         payload = {
             "source_file":  result.raw_file,
@@ -272,7 +272,6 @@ class SupabaseUploader:
         params = {"id": f"eq.{request_id}"}
         body: dict[str, Any] = {"status": status}
         if status in ("completed", "failed"):
-            from datetime import datetime, timezone
             body["completed_at"] = datetime.now(timezone.utc).isoformat()
             body["files_processed"] = files_processed
         if error_message:
