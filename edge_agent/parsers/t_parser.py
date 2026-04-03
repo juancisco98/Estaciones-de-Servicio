@@ -39,7 +39,7 @@ from .base_parser import BaseParser, ParseResult
 
 
 _T_LINE_RE = re.compile(
-    r'^(\d{2}-\d{2}-\d{2})\s+'         # [1] date DD-MM-YY
+    r'^(\d{2}-\d{2}-\d{2,4})\s+'       # [1] date DD-MM-YY or DD-MM-YYYY
     r'(\d{2}:\d{2})\s+'                 # [2] time HH:MM
     r'TQ\s+(\d+)\s+'                    # [3] tank number (1-5)
     r'LTS\.:\s*([\d.,]+)\s+'            # [4] liters dispensed this shift
@@ -55,14 +55,15 @@ _T_LINE_RE = re.compile(
 # No hardcoded limit — accept any tank number (1-99)
 
 
-def _parse_t_date(ddmmyy: str, hhmm: str) -> str:
+def _parse_t_date(date_str: str, hhmm: str) -> str:
     """
-    Parse DD-MM-YY + HH:MM → ISO 8601.
-    Python %y: 00-68 → 2000-2068, 69-99 → 1969-1999.
-    For current stations (2026) the year field will be '26' → 2026.
-    The sample file shows '20' (from a 2020-era capture), parsed correctly as 2020.
+    Parse DD-MM-YY or DD-MM-YYYY + HH:MM → ISO 8601.
+    Supports both 2-digit year (legacy) and 4-digit year (current).
     """
-    dt = datetime.strptime(f"{ddmmyy} {hhmm}", "%d-%m-%y %H:%M")
+    # Detect 4-digit vs 2-digit year by length of year part
+    year_part = date_str.split("-")[2]
+    fmt = "%d-%m-%Y" if len(year_part) == 4 else "%d-%m-%y"
+    dt = datetime.strptime(f"{date_str} {hhmm}", f"{fmt} %H:%M")
     return dt.isoformat()
 
 
