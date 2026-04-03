@@ -235,6 +235,59 @@ class SupabaseUploader:
         dead_file.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
         logger.error("Dead letter written: %s", dead_file)
 
+    # ── HTTP helpers ──────────────────────────────────────────────────────────
+
+    def _http_get(self, url: str, params: dict, headers: dict | None = None) -> list | None:
+        """GET from Supabase REST, return parsed JSON list or None on error."""
+        hdrs = headers or {**self._headers, "Prefer": "return=representation"}
+        try:
+            resp = httpx.get(url, headers=hdrs, params=params, timeout=10.0)
+            if resp.status_code == 200:
+                return resp.json()
+            return None
+        except Exception as exc:
+            logger.debug("HTTP GET failed: %s", exc)
+            return None
+
+    # ── Alert insertion ──────────────────────────────────────────────────────
+
+    def insert_alert(
+        self,
+        station_id: str,
+        level: str,
+        alert_type: str,
+        title: str,
+        message: str,
+        related_date: str | None = None,
+        related_file: str | None = None,
+        metadata: dict | None = None,
+    ) -> bool:
+        """Insert an alert directly into the alerts table."""
+        import uuid as _uuid
+        url = f"{self.base_url}/rest/v1/alerts"
+        body = {
+            "id": str(_uuid.uuid4()),
+            "station_id": station_id,
+            "level": level,
+            "type": alert_type,
+            "title": title,
+            "message": message,
+            "related_date": related_date,
+            "related_file": related_file,
+            "resolved": False,
+            "metadata": metadata or {},
+        }
+        try:
+            resp = httpx.post(url, json=body, headers=self._headers, timeout=10.0)
+            if resp.status_code in (200, 201):
+                logger.info("Alert created: [%s] %s", level, title)
+                return True
+            logger.warning("Alert insert failed %d: %s", resp.status_code, resp.text[:200])
+            return False
+        except Exception as exc:
+            logger.warning("Alert insert error: %s", exc)
+            return False
+
     # ── Scan Requests (dashboard refresh button) ─────────────────────────────
 
     def check_scan_request(self, station_id: str) -> dict | None:

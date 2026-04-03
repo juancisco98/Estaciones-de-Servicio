@@ -217,6 +217,13 @@ def process_file(
     success = uploader.upload_parse_result(result)
 
     if success:
+        # Check for alerts (tank levels, negative values, reconciliation)
+        try:
+            from alert_checker import AlertChecker
+            AlertChecker(uploader).check_alerts(result, station_id)
+        except Exception as exc:
+            logger.debug("Alert check skipped: %s", exc)
+
         # Solo marcar como procesado si el upload fue exitoso
         state.mark_processed(
             file_path=file_path,
