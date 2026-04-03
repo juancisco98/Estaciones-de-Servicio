@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Fuel, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { Station, DailyClosing, SalesTransaction, User } from '../types';
 import StationFilter from './StationFilter';
-import TurnoFilter from './TurnoFilter';
+import TurnoFilter, { Turno, getTurnoFromTs } from './TurnoFilter';
 import { getArgentinaToday } from '../utils/dateUtils';
 
 interface PlayaViewProps {
@@ -114,7 +114,7 @@ const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, salesTra
     const [dateFrom, setDateFrom] = useState(getArgentinaToday);
     const [dateTo, setDateTo] = useState(getArgentinaToday);
     const [selectedStationId, setSelectedStationId] = useState<string | null>(activeStationId ?? null);
-    const [selectedTurno, setSelectedTurno] = useState<number | null>(null);
+    const [selectedTurno, setSelectedTurno] = useState<Turno | null>(null);
     const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
     const handleStationChange = (id: string | null) => {
@@ -131,7 +131,6 @@ const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, salesTra
             .filter(c => c.forecourtTotal != null)
             .filter(c => c.shiftDate >= dateFrom && c.shiftDate <= dateTo)
             .filter(c => !selectedStationId || c.stationId === selectedStationId)
-            .filter(c => selectedTurno == null || c.turno === selectedTurno)
             .map(c => ({
                 key: `P:${c.stationId}:${c.shiftDate}:${c.turno ?? 0}`,
                 stationId: c.stationId,
@@ -150,7 +149,7 @@ const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, salesTra
         const veTxs = salesTransactions
             .filter(t => t.shiftDate >= dateFrom && t.shiftDate <= dateTo)
             .filter(t => !selectedStationId || t.stationId === selectedStationId)
-            .filter(t => selectedTurno == null || t.turno === selectedTurno)
+            .filter(t => !selectedTurno || getTurnoFromTs(t.transactionTs) === selectedTurno)
             .filter(t => !hasPData.has(`${t.stationId}:${t.shiftDate}`));
 
         const veMap = new Map<string, DayRow>();
@@ -206,14 +205,6 @@ const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, salesTra
     const totalPlaya = dayRows.reduce((sum, d) => sum + d.total, 0);
     const totalLiters = dayRows.reduce((sum, d) => sum + d.fuelLiters, 0);
 
-    // Available turnos for filter
-    const availableTurnos = useMemo(() => {
-        const set = new Set<number>();
-        for (const t of salesTransactions) { if (t.turno != null) set.add(t.turno); }
-        for (const c of dailyClosings) { if (c.turno != null) set.add(c.turno); }
-        return Array.from(set);
-    }, [salesTransactions, dailyClosings]);
-
     const getTransactionsForRow = (row: DayRow) =>
         salesTransactions.filter(t =>
             t.stationId === row.stationId &&
@@ -234,7 +225,7 @@ const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, salesTra
 
                 <div className="flex flex-wrap items-center gap-3">
                     <StationFilter stations={stations} selectedStationId={selectedStationId} onChange={handleStationChange} className="min-w-[200px]" />
-                    <TurnoFilter turnos={availableTurnos} selected={selectedTurno} onChange={setSelectedTurno} />
+                    <TurnoFilter selected={selectedTurno} onChange={setSelectedTurno} />
                     <div className="flex items-center gap-1.5">
                         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
                             className="text-sm rounded-xl bg-gray-100 dark:bg-slate-800 border border-transparent text-gray-800 dark:text-white px-4 py-2.5 min-h-[44px] focus:outline-none focus:border-amber-400" />

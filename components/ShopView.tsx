@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { ShoppingBag, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { Station, DailyClosing, SalesTransaction, User } from '../types';
 import StationFilter from './StationFilter';
-import TurnoFilter from './TurnoFilter';
+import TurnoFilter, { Turno, getTurnoFromTs } from './TurnoFilter';
 import { getArgentinaToday } from '../utils/dateUtils';
 
 interface ShopViewProps {
@@ -91,7 +91,7 @@ const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, salesTrans
     const [dateFrom, setDateFrom] = useState(getArgentinaToday);
     const [dateTo, setDateTo] = useState(getArgentinaToday);
     const [selectedStationId, setSelectedStationId] = useState<string | null>(activeStationId ?? null);
-    const [selectedTurno, setSelectedTurno] = useState<number | null>(null);
+    const [selectedTurno, setSelectedTurno] = useState<Turno | null>(null);
     const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
     const handleStationChange = (id: string | null) => {
@@ -108,7 +108,6 @@ const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, salesTrans
             .filter(c => c.shopTotal != null)
             .filter(c => c.shiftDate >= dateFrom && c.shiftDate <= dateTo)
             .filter(c => !selectedStationId || c.stationId === selectedStationId)
-            .filter(c => selectedTurno == null || c.turno === selectedTurno)
             .map(c => ({
                 key: `S:${c.stationId}:${c.shiftDate}:${c.turno ?? 0}`,
                 stationId: c.stationId,
@@ -128,7 +127,7 @@ const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, salesTrans
             .filter(t => Number(t.productCode) > MAX_FUEL_CODE)
             .filter(t => t.shiftDate >= dateFrom && t.shiftDate <= dateTo)
             .filter(t => !selectedStationId || t.stationId === selectedStationId)
-            .filter(t => selectedTurno == null || t.turno === selectedTurno)
+            .filter(t => !selectedTurno || getTurnoFromTs(t.transactionTs) === selectedTurno)
             .filter(t => !hasSData.has(`${t.stationId}:${t.shiftDate}`));
 
         const veMap = new Map<string, DayRow>();
@@ -186,13 +185,6 @@ const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, salesTrans
 
     const totalShop = dayRows.reduce((sum, d) => sum + d.total, 0);
 
-    const availableTurnos = useMemo(() => {
-        const set = new Set<number>();
-        for (const t of salesTransactions) { if (t.turno != null) set.add(t.turno); }
-        for (const c of dailyClosings) { if (c.turno != null) set.add(c.turno); }
-        return Array.from(set);
-    }, [salesTransactions, dailyClosings]);
-
     const getTransactionsForRow = (row: DayRow) =>
         salesTransactions.filter(t =>
             t.stationId === row.stationId &&
@@ -213,7 +205,7 @@ const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, salesTrans
 
                 <div className="flex flex-wrap items-center gap-3">
                     <StationFilter stations={stations} selectedStationId={selectedStationId} onChange={handleStationChange} className="min-w-[200px]" />
-                    <TurnoFilter turnos={availableTurnos} selected={selectedTurno} onChange={setSelectedTurno} />
+                    <TurnoFilter selected={selectedTurno} onChange={setSelectedTurno} />
                     <div className="flex items-center gap-1.5">
                         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
                             className="text-sm rounded-xl bg-gray-100 dark:bg-slate-800 border border-transparent text-gray-800 dark:text-white px-4 py-2.5 min-h-[44px] focus:outline-none focus:border-violet-400" />
