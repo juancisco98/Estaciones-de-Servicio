@@ -53,6 +53,8 @@ export interface DbSalesTransactionRow {
   total_amount: number | string;
   payment_method?: string | null;
   shift_date: string;
+  turno?: number | null;
+  area_code?: number | null;
   daily_closing_id?: string | null;
   raw_line?: string | null;
   ingested_at?: string;
@@ -79,7 +81,7 @@ export interface DbTankLevelRow {
   file_name: string;
   recorded_at: string;
   shift_date?: string | null;
-  tank_id: string;         // 'TQ1' | 'TQ2' | 'TQ3' | 'TQ4' | 'TQ5'
+  tank_id: string;         // 'TQ1', 'TQ2', ..., 'TQN' (dynamic)
   product_code: string;
   product_name: string;
   level_liters: number | string;
@@ -94,6 +96,7 @@ export interface DbDailyClosingRow {
   id: string;
   station_id: string;
   shift_date: string;
+  turno?: number | null;
   forecourt_total?: number | string | null;
   shop_total?: number | string | null;
   transactions_total?: number | string | null;

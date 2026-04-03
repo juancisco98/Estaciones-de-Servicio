@@ -93,9 +93,7 @@ export const EMPLOYEE_ROLE_LABELS: Record<string, string> = {
   CASHIER:   'Cajero',
 };
 
-// Tank IDs
-export const TANK_IDS = ['TQ1', 'TQ2', 'TQ3', 'TQ4', 'TQ5', 'TQ6'] as const;
-export type TankIdType = typeof TANK_IDS[number];
+// Tank IDs are dynamic (read from DB) — no hardcoded list
 
 // Tank alert thresholds (liters) — also stored in station_knowledge per station
 export const TANK_WARNING_LITERS  = 800;

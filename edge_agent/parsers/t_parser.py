@@ -51,7 +51,8 @@ _T_LINE_RE = re.compile(
     r'NRO\.BOCA\s+(\d+)\s*$'           # [10] nozzle number
 )
 
-_VALID_TANKS = {"1", "2", "3", "4", "5", "6"}
+
+# No hardcoded limit — accept any tank number (1-99)
 
 
 def _parse_t_date(ddmmyy: str, hhmm: str) -> str:
@@ -68,7 +69,7 @@ def _parse_t_date(ddmmyy: str, hhmm: str) -> str:
 class TParser(BaseParser):
     """
     Parser for T*.TXT — tank level readings.
-    One row per tank (TQ1-TQ5). Goes into `tank_levels` Supabase table.
+    One row per tank (TQ1, TQ2, ... TQN — dynamic). Goes into `tank_levels` Supabase table.
     The STOCK field is used by skill_inventory_alert() to detect critical levels.
     """
 
@@ -93,8 +94,8 @@ class TParser(BaseParser):
                 turno_str, playa_str, nozzle_str,
             ) = m.groups()
 
-            if tank_num_str not in _VALID_TANKS:
-                result.add_error(line_num, line, f"Unknown tank number: TQ{tank_num_str}")
+            if not tank_num_str.isdigit():
+                result.add_error(line_num, line, f"Invalid tank number: {tank_num_str!r}")
                 continue
 
             try:

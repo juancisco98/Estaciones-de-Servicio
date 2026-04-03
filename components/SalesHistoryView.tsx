@@ -3,6 +3,7 @@ import { ShoppingCart, Search, Filter, AlertTriangle, TrendingUp } from 'lucide-
 import { Station, SalesTransaction, User } from '../types';
 import { PAYMENT_METHOD_LABELS } from '../constants';
 import { getArgentinaToday } from '../utils/dateUtils';
+import TurnoFilter from './TurnoFilter';
 
 interface SalesHistoryViewProps {
     stations: Station[];
@@ -18,6 +19,7 @@ const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ stations, salesTran
     );
     const [dateFrom, setDateFrom] = useState(getArgentinaToday);
     const [dateTo, setDateTo]     = useState(getArgentinaToday);
+    const [selectedTurno, setSelectedTurno] = useState<number | null>(null);
     const [search, setSearch]     = useState('');
 
     const stationMap = useMemo(() => new Map(stations.map(s => [s.id, s.name])), [stations]);
@@ -26,6 +28,7 @@ const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ stations, salesTran
         let list = salesTransactions;
         if (selectedStation) list = list.filter(t => t.stationId === selectedStation);
         list = list.filter(t => t.shiftDate >= dateFrom && t.shiftDate <= dateTo);
+        if (selectedTurno != null) list = list.filter(t => t.turno === selectedTurno);
         if (search.trim()) {
             const q = search.toLowerCase();
             list = list.filter(t =>
@@ -35,7 +38,13 @@ const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ stations, salesTran
             );
         }
         return list.sort((a, b) => b.transactionTs.localeCompare(a.transactionTs));
-    }, [salesTransactions, selectedStation, dateFrom, dateTo, search]);
+    }, [salesTransactions, selectedStation, dateFrom, dateTo, selectedTurno, search]);
+
+    const availableTurnos = useMemo(() => {
+        const set = new Set<number>();
+        for (const t of salesTransactions) { if (t.turno != null) set.add(t.turno); }
+        return Array.from(set);
+    }, [salesTransactions]);
 
     const totalRevenue   = filtered.reduce((s, t) => s + t.totalAmount, 0);
     const totalFuelLiters = filtered.filter(t => Number(t.productCode) <= 20).reduce((s, t) => s + t.quantity, 0);
@@ -64,6 +73,8 @@ const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ stations, salesTran
                             ))}
                         </select>
                     )}
+
+                    <TurnoFilter turnos={availableTurnos} selected={selectedTurno} onChange={setSelectedTurno} />
 
                     <div className="flex items-center gap-1">
                         <input

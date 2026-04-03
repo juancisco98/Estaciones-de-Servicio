@@ -72,6 +72,8 @@ export interface SalesTransaction {
   totalAmount: number;       // actual amount charged (authoritative for reconciliation)
   paymentMethod?: PaymentMethod;
   shiftDate: string;         // YYYY-MM-DD
+  turno?: number;            // shift number from VE file
+  areaCode?: number;         // 1=playa (forecourt), 0=salon (shop)
   dailyClosingId?: string;   // assigned after reconciliation
   rawLine?: string;          // original unparsed line (audit trail)
   ingestedAt?: string;
@@ -96,7 +98,7 @@ export interface CardPayment {
 
 // ── TANK LEVELS (from T*.TXT) ──
 
-export type TankId = 'TQ1' | 'TQ2' | 'TQ3' | 'TQ4' | 'TQ5';
+export type TankId = string;  // dynamic: TQ1, TQ2, ..., TQN
 
 export interface TankLevel {
   id: string;
@@ -123,6 +125,7 @@ export interface DailyClosing {
   id: string;
   stationId: string;
   shiftDate: string;          // YYYY-MM-DD
+  turno?: number;             // shift number from P/S file
   forecourtTotal?: number;    // TOTAL SALE from P*.TXT
   shopTotal?: number;         // TOTAL SALE from S*.TXT
   transactionsTotal?: number; // SUM(sales_transactions.total_amount)

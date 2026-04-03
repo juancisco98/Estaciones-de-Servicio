@@ -113,8 +113,8 @@ class PParser(BaseParser):
             "p_file_name":       self.file_name,
             "status":            "PENDING",
             # Full label dict stored for audit — reconciler will use forecourt_total
+            "turno":             turno,
             "_totals_snapshot":  totals,
-            "_turno":            turno,
             "_playa":            playa,
         }
 

@@ -103,8 +103,8 @@ class SParser(BaseParser):
             "shop_total":      str(shop_total) if shop_total is not None else None,
             "s_file_name":     self.file_name,
             "status":          "PENDING",
+            "turno":           turno,
             "_totals_snapshot": totals,
-            "_turno":          turno,
             "_salon":          salon,
         }
 

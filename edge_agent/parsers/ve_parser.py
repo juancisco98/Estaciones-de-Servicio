@@ -155,9 +155,9 @@ class VEParser(BaseParser):
                 "total_amount":    str(total_amount),
                 "payment_method":  _map_payment_code(payment_code),
                 # metadata for analytics and auditing
+                "turno":           int(turno_str),
+                "area_code":       area_code,       # 1=playa, 0=salon
                 "_ticket_number":  int(ticket_number_str),
-                "_turno":          int(turno_str),
-                "_area_code":      area_code,       # 1=playa, 0=salon
                 "_isla":           int(isla_str),
                 "_employee_code":  int(employee_code_str),
                 "_payment_code":   payment_code,
