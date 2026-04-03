@@ -94,7 +94,7 @@ export const EMPLOYEE_ROLE_LABELS: Record<string, string> = {
 };
 
 // Tank IDs
-export const TANK_IDS = ['TQ1', 'TQ2', 'TQ3', 'TQ4', 'TQ5'] as const;
+export const TANK_IDS = ['TQ1', 'TQ2', 'TQ3', 'TQ4', 'TQ5', 'TQ6'] as const;
 export type TankIdType = typeof TANK_IDS[number];
 
 // Tank alert thresholds (liters) — also stored in station_knowledge per station

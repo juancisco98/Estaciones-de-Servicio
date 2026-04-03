@@ -51,7 +51,7 @@ _T_LINE_RE = re.compile(
     r'NRO\.BOCA\s+(\d+)\s*$'           # [10] nozzle number
 )
 
-_VALID_TANKS = {"1", "2", "3", "4", "5"}
+_VALID_TANKS = {"1", "2", "3", "4", "5", "6"}
 
 
 def _parse_t_date(ddmmyy: str, hhmm: str) -> str:

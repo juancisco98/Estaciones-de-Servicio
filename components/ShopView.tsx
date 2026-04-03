@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { ShoppingBag, Search, ChevronDown, ChevronUp } from 'lucide-react';
-import { Station, DailyClosing, SalesTransaction, User } from '../types';
+import { Station, SalesTransaction, User } from '../types';
 import StationFilter from './StationFilter';
 import { getArgentinaToday } from '../utils/dateUtils';
 
 interface ShopViewProps {
     stations: Station[];
-    dailyClosings: DailyClosing[];
+    dailyClosings?: unknown[];  // kept for prop compat, not used
     salesTransactions: SalesTransaction[];
     currentUser: User | null;
     activeStationId?: string | null;
@@ -23,11 +23,19 @@ interface ProductGroup {
 
 const MAX_FUEL_CODE = 20;
 
+interface DaySummary {
+    key: string;
+    stationId: string;
+    shiftDate: string;
+    shopTotal: number;
+    productCount: number;
+    txCount: number;
+}
+
 const DayBreakdown: React.FC<{ transactions: SalesTransaction[] }> = ({ transactions }) => {
     const products = useMemo(() => {
         const map = new Map<string, ProductGroup>();
         for (const t of transactions) {
-            // Solo productos de tienda (code > 20), excluir combustibles
             const code = Number(t.productCode);
             if (code > 0 && code <= MAX_FUEL_CODE) continue;
 
@@ -69,18 +77,18 @@ const DayBreakdown: React.FC<{ transactions: SalesTransaction[] }> = ({ transact
                     </div>
                 </>
             ) : (
-                <p className="text-xs text-gray-400 dark:text-slate-500 text-center py-2">Sin ventas detalladas para este dia</p>
+                <p className="text-xs text-gray-400 dark:text-slate-500 text-center py-2">Sin productos de tienda para este dia</p>
             )}
         </div>
     );
 };
 
-const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, salesTransactions, currentUser, activeStationId, onStationChange }) => {
+const ShopView: React.FC<ShopViewProps> = ({ stations, salesTransactions, currentUser, activeStationId, onStationChange }) => {
     const [search, setSearch] = useState('');
     const [dateFrom, setDateFrom] = useState(getArgentinaToday);
     const [dateTo, setDateTo] = useState(getArgentinaToday);
     const [selectedStationId, setSelectedStationId] = useState<string | null>(activeStationId ?? null);
-    const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
     const handleStationChange = (id: string | null) => {
         setSelectedStationId(id);
@@ -89,21 +97,54 @@ const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, salesTrans
 
     const stationMap = useMemo(() => new Map(stations.map(s => [s.id, s.name])), [stations]);
 
-    const filtered = useMemo(() => {
-        let list = dailyClosings.filter(c => c.shopTotal != null);
-        if (selectedStationId) list = list.filter(c => c.stationId === selectedStationId);
-        list = list.filter(c => c.shiftDate >= dateFrom && c.shiftDate <= dateTo);
+    // Group NON-FUEL sales by (stationId, shiftDate)
+    const daySummaries = useMemo(() => {
+        let txs = salesTransactions.filter(t => {
+            const code = Number(t.productCode);
+            return !(code > 0 && code <= MAX_FUEL_CODE);  // exclude fuel
+        });
+        txs = txs.filter(t => t.shiftDate >= dateFrom && t.shiftDate <= dateTo);
+        if (selectedStationId) txs = txs.filter(t => t.stationId === selectedStationId);
+
+        const map = new Map<string, DaySummary>();
+        for (const t of txs) {
+            const key = `${t.stationId}:${t.shiftDate}`;
+            const existing = map.get(key);
+            if (existing) {
+                existing.shopTotal += t.totalAmount;
+                existing.txCount += 1;
+            } else {
+                map.set(key, {
+                    key,
+                    stationId: t.stationId,
+                    shiftDate: t.shiftDate,
+                    shopTotal: t.totalAmount,
+                    productCount: 0,
+                    txCount: 1,
+                });
+            }
+        }
+
+        // Count distinct products per day
+        for (const [key, summary] of map) {
+            const dayTxs = txs.filter(t => `${t.stationId}:${t.shiftDate}` === key);
+            summary.productCount = new Set(dayTxs.map(t => t.productName)).size;
+        }
+
+        let results = Array.from(map.values());
+
         if (search.trim()) {
             const q = search.toLowerCase();
-            list = list.filter(c =>
-                (stationMap.get(c.stationId) ?? '').toLowerCase().includes(q) ||
-                c.shiftDate.includes(q)
+            results = results.filter(d =>
+                (stationMap.get(d.stationId) ?? '').toLowerCase().includes(q) ||
+                d.shiftDate.includes(q)
             );
         }
-        return list.sort((a, b) => b.shiftDate.localeCompare(a.shiftDate));
-    }, [dailyClosings, selectedStationId, dateFrom, dateTo, search, stationMap]);
 
-    const totalShop = filtered.reduce((sum, c) => sum + (c.shopTotal ?? 0), 0);
+        return results.sort((a, b) => b.shiftDate.localeCompare(a.shiftDate) || a.stationId.localeCompare(b.stationId));
+    }, [salesTransactions, selectedStationId, dateFrom, dateTo, search, stationMap]);
+
+    const totalShop = daySummaries.reduce((sum, d) => sum + d.shopTotal, 0);
 
     const getTransactionsForDay = (stationId: string, shiftDate: string) =>
         salesTransactions.filter(t => t.stationId === stationId && t.shiftDate === shiftDate);
@@ -116,7 +157,7 @@ const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, salesTrans
                     <ShoppingBag className="w-6 h-6 text-violet-500" />
                     <h1 className="text-2xl font-black text-gray-900 dark:text-white">Mini Mercado</h1>
                     <span className="text-xs font-bold px-3 py-1 rounded-full bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-400 ml-auto">
-                        {filtered.length} cierres | Total: {fmt(totalShop)}
+                        {daySummaries.length} dias | Total: {fmt(totalShop)}
                     </span>
                 </div>
 
@@ -151,42 +192,40 @@ const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, salesTrans
 
             {/* List */}
             <div className="flex-1 overflow-y-auto p-5 space-y-3">
-                {filtered.length === 0 ? (
+                {daySummaries.length === 0 ? (
                     <div className="py-24 text-center">
                         <ShoppingBag className="w-16 h-16 mx-auto text-gray-300 dark:text-slate-700 mb-4" />
                         <p className="text-gray-400 dark:text-slate-500 font-medium text-base">Sin datos de mini mercado para el periodo</p>
                     </div>
                 ) : (
-                    filtered.map(closing => {
-                        const isExpanded = expandedId === closing.id;
+                    daySummaries.map(day => {
+                        const isExpanded = expandedKey === day.key;
                         return (
                             <div
-                                key={closing.id}
+                                key={day.key}
                                 className="bg-white dark:bg-slate-900 rounded-xl border border-white/80 dark:border-white/8 overflow-hidden"
                                 style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.04), 0 2px 12px rgba(0,0,0,0.07)' }}
                             >
                                 <button
                                     className="w-full px-5 py-4 flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-left"
-                                    onClick={() => setExpandedId(isExpanded ? null : closing.id)}
+                                    onClick={() => setExpandedKey(isExpanded ? null : day.key)}
                                 >
                                     <ShoppingBag className="w-5 h-5 text-violet-500 shrink-0" />
                                     <div className="flex-1 min-w-0">
                                         <span className="text-sm font-bold text-gray-900 dark:text-white">
-                                            {stationMap.get(closing.stationId) ?? closing.stationId}
+                                            {stationMap.get(day.stationId) ?? day.stationId}
                                         </span>
-                                        <span className="text-xs text-gray-400 dark:text-slate-500 font-mono ml-2">{closing.shiftDate}</span>
-                                        {closing.sFileName && (
-                                            <span className="text-xs text-gray-400 dark:text-slate-500 ml-2">({closing.sFileName})</span>
-                                        )}
+                                        <span className="text-xs text-gray-400 dark:text-slate-500 font-mono ml-2">{day.shiftDate}</span>
+                                        <span className="text-xs text-gray-400 dark:text-slate-500 ml-2">({day.productCount} productos, {day.txCount} ventas)</span>
                                     </div>
                                     <div className="text-right shrink-0 mr-2">
-                                        <p className="text-sm font-bold text-gray-900 dark:text-white">{fmt(closing.shopTotal)}</p>
+                                        <p className="text-sm font-bold text-gray-900 dark:text-white">{fmt(day.shopTotal)}</p>
                                         <p className="text-[10px] text-gray-400 dark:text-slate-500">Total Tienda</p>
                                     </div>
                                     {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
                                 </button>
                                 {isExpanded && (
-                                    <DayBreakdown transactions={getTransactionsForDay(closing.stationId, closing.shiftDate)} />
+                                    <DayBreakdown transactions={getTransactionsForDay(day.stationId, day.shiftDate)} />
                                 )}
                             </div>
                         );

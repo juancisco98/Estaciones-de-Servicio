@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { Fuel, Search, ChevronDown, ChevronUp } from 'lucide-react';
-import { Station, DailyClosing, SalesTransaction, User } from '../types';
+import { Station, SalesTransaction, User } from '../types';
 import StationFilter from './StationFilter';
 import { getArgentinaToday } from '../utils/dateUtils';
 
 interface PlayaViewProps {
     stations: Station[];
-    dailyClosings: DailyClosing[];
+    dailyClosings?: unknown[];  // kept for prop compat, not used
     salesTransactions: SalesTransaction[];
     currentUser: User | null;
     activeStationId?: string | null;
@@ -24,6 +24,16 @@ interface ProductGroup {
     totalAmount: number;
     totalQuantity: number;
     count: number;
+}
+
+interface DaySummary {
+    key: string;           // stationId:shiftDate
+    stationId: string;
+    shiftDate: string;
+    fuelTotal: number;
+    variosTotal: number;
+    fuelLiters: number;
+    txCount: number;
 }
 
 const DayBreakdown: React.FC<{ transactions: SalesTransaction[] }> = ({ transactions }) => {
@@ -97,12 +107,12 @@ const DayBreakdown: React.FC<{ transactions: SalesTransaction[] }> = ({ transact
     );
 };
 
-const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, salesTransactions, currentUser, activeStationId, onStationChange }) => {
+const PlayaView: React.FC<PlayaViewProps> = ({ stations, salesTransactions, currentUser, activeStationId, onStationChange }) => {
     const [search, setSearch] = useState('');
     const [dateFrom, setDateFrom] = useState(getArgentinaToday);
     const [dateTo, setDateTo] = useState(getArgentinaToday);
     const [selectedStationId, setSelectedStationId] = useState<string | null>(activeStationId ?? null);
-    const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
     const handleStationChange = (id: string | null) => {
         setSelectedStationId(id);
@@ -111,21 +121,52 @@ const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, salesTra
 
     const stationMap = useMemo(() => new Map(stations.map(s => [s.id, s.name])), [stations]);
 
-    const filtered = useMemo(() => {
-        let list = dailyClosings.filter(c => c.forecourtTotal != null);
-        if (selectedStationId) list = list.filter(c => c.stationId === selectedStationId);
-        list = list.filter(c => c.shiftDate >= dateFrom && c.shiftDate <= dateTo);
+    // Group sales_transactions by (stationId, shiftDate) — compute daily fuel totals
+    const daySummaries = useMemo(() => {
+        let txs = salesTransactions.filter(t => t.shiftDate >= dateFrom && t.shiftDate <= dateTo);
+        if (selectedStationId) txs = txs.filter(t => t.stationId === selectedStationId);
+
+        const map = new Map<string, DaySummary>();
+        for (const t of txs) {
+            const key = `${t.stationId}:${t.shiftDate}`;
+            const existing = map.get(key);
+            const isFuel = Number(t.productCode) > 0 && Number(t.productCode) <= MAX_FUEL_CODE;
+            if (existing) {
+                if (isFuel) {
+                    existing.fuelTotal += t.totalAmount;
+                    existing.fuelLiters += t.quantity;
+                } else {
+                    existing.variosTotal += t.totalAmount;
+                }
+                existing.txCount += 1;
+            } else {
+                map.set(key, {
+                    key,
+                    stationId: t.stationId,
+                    shiftDate: t.shiftDate,
+                    fuelTotal: isFuel ? t.totalAmount : 0,
+                    variosTotal: isFuel ? 0 : t.totalAmount,
+                    fuelLiters: isFuel ? t.quantity : 0,
+                    txCount: 1,
+                });
+            }
+        }
+
+        let results = Array.from(map.values());
+
         if (search.trim()) {
             const q = search.toLowerCase();
-            list = list.filter(c =>
-                (stationMap.get(c.stationId) ?? '').toLowerCase().includes(q) ||
-                c.shiftDate.includes(q)
+            results = results.filter(d =>
+                (stationMap.get(d.stationId) ?? '').toLowerCase().includes(q) ||
+                d.shiftDate.includes(q)
             );
         }
-        return list.sort((a, b) => b.shiftDate.localeCompare(a.shiftDate));
-    }, [dailyClosings, selectedStationId, dateFrom, dateTo, search, stationMap]);
 
-    const totalPlaya = filtered.reduce((sum, c) => sum + (c.forecourtTotal ?? 0), 0);
+        return results.sort((a, b) => b.shiftDate.localeCompare(a.shiftDate) || a.stationId.localeCompare(b.stationId));
+    }, [salesTransactions, selectedStationId, dateFrom, dateTo, search, stationMap]);
+
+    const totalPlaya = daySummaries.reduce((sum, d) => sum + d.fuelTotal + d.variosTotal, 0);
+    const totalLiters = daySummaries.reduce((sum, d) => sum + d.fuelLiters, 0);
 
     const getTransactionsForDay = (stationId: string, shiftDate: string) =>
         salesTransactions.filter(t => t.stationId === stationId && t.shiftDate === shiftDate);
@@ -138,7 +179,7 @@ const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, salesTra
                     <Fuel className="w-6 h-6 text-amber-500" />
                     <h1 className="text-2xl font-black text-gray-900 dark:text-white">Playa</h1>
                     <span className="text-xs font-bold px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 ml-auto">
-                        {filtered.length} cierres | Total: {fmt(totalPlaya)}
+                        {daySummaries.length} dias | {fmt(totalPlaya)} | {fmtQty(totalLiters)} L
                     </span>
                 </div>
 
@@ -173,42 +214,40 @@ const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, salesTra
 
             {/* List */}
             <div className="flex-1 overflow-y-auto p-5 space-y-3">
-                {filtered.length === 0 ? (
+                {daySummaries.length === 0 ? (
                     <div className="py-24 text-center">
                         <Fuel className="w-16 h-16 mx-auto text-gray-300 dark:text-slate-700 mb-4" />
                         <p className="text-gray-400 dark:text-slate-500 font-medium text-base">Sin datos de playa para el periodo</p>
                     </div>
                 ) : (
-                    filtered.map(closing => {
-                        const isExpanded = expandedId === closing.id;
+                    daySummaries.map(day => {
+                        const isExpanded = expandedKey === day.key;
                         return (
                             <div
-                                key={closing.id}
+                                key={day.key}
                                 className="bg-white dark:bg-slate-900 rounded-xl border border-white/80 dark:border-white/8 overflow-hidden"
                                 style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.04), 0 2px 12px rgba(0,0,0,0.07)' }}
                             >
                                 <button
                                     className="w-full px-5 py-4 flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-left"
-                                    onClick={() => setExpandedId(isExpanded ? null : closing.id)}
+                                    onClick={() => setExpandedKey(isExpanded ? null : day.key)}
                                 >
                                     <Fuel className="w-5 h-5 text-amber-500 shrink-0" />
                                     <div className="flex-1 min-w-0">
                                         <span className="text-sm font-bold text-gray-900 dark:text-white">
-                                            {stationMap.get(closing.stationId) ?? closing.stationId}
+                                            {stationMap.get(day.stationId) ?? day.stationId}
                                         </span>
-                                        <span className="text-xs text-gray-400 dark:text-slate-500 font-mono ml-2">{closing.shiftDate}</span>
-                                        {closing.pFileName && (
-                                            <span className="text-xs text-gray-400 dark:text-slate-500 ml-2">({closing.pFileName})</span>
-                                        )}
+                                        <span className="text-xs text-gray-400 dark:text-slate-500 font-mono ml-2">{day.shiftDate}</span>
+                                        <span className="text-xs text-gray-400 dark:text-slate-500 ml-2">({day.txCount} transacciones)</span>
                                     </div>
                                     <div className="text-right shrink-0 mr-2">
-                                        <p className="text-sm font-bold text-gray-900 dark:text-white">{fmt(closing.forecourtTotal)}</p>
-                                        <p className="text-[10px] text-gray-400 dark:text-slate-500">Total Playa</p>
+                                        <p className="text-sm font-bold text-gray-900 dark:text-white">{fmt(day.fuelTotal + day.variosTotal)}</p>
+                                        <p className="text-[10px] text-amber-500">{fmtQty(day.fuelLiters)} L</p>
                                     </div>
                                     {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
                                 </button>
                                 {isExpanded && (
-                                    <DayBreakdown transactions={getTransactionsForDay(closing.stationId, closing.shiftDate)} />
+                                    <DayBreakdown transactions={getTransactionsForDay(day.stationId, day.shiftDate)} />
                                 )}
                             </div>
                         );
