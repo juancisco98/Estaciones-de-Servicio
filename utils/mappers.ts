@@ -145,6 +145,8 @@ export const salesTransactionToDb = (tx: SalesTransaction): Record<string, unkno
   total_amount:     tx.totalAmount,
   payment_method:   tx.paymentMethod ?? null,
   shift_date:       tx.shiftDate,
+  turno:            tx.turno ?? null,
+  area_code:        tx.areaCode ?? null,
   daily_closing_id: tx.dailyClosingId ?? null,
   raw_line:         tx.rawLine ?? null,
 });
@@ -248,6 +250,7 @@ export const dailyClosingToDb = (dc: DailyClosing): Record<string, unknown> => {
   if (dc.shopTotal         !== undefined) payload.shop_total         = dc.shopTotal;
   if (dc.transactionsTotal !== undefined) payload.transactions_total = dc.transactionsTotal;
   if (dc.reconciliationDiff !== undefined) payload.reconciliation_diff = dc.reconciliationDiff;
+  if (dc.turno             !== undefined) payload.turno              = dc.turno;
   if (dc.pFileName         !== undefined) payload.p_file_name        = dc.pFileName;
   if (dc.sFileName         !== undefined) payload.s_file_name        = dc.sFileName;
   return payload;

@@ -15,7 +15,7 @@ You are the **Central Operational Brain** for a network of 60 gas stations. Your
 ### Layer 2: Logistics (Data Structuring)
 - **Sales Parsing (`VE`):** Extract timestamp, product code, product name (e.g., SUPER, DIESEL X 10, CAFE), units/liters, unit price, and total amount.
 - **Financial Mapping (`C`, `P`, `S`):** Map payment methods including VISA, Mercado Pago, MODO, and Corporate Accounts (e.g., ZONIS S.A., BAL-MAR S.R.L.).
-- **Inventory Tracking (`T`):** Record remaining fuel levels (STOCK) for tanks TQ 1 through TQ 5 at each shift close.
+- **Inventory Tracking (`T`):** Record remaining fuel levels (STOCK) for tanks TQ1 through TQN (dinámico, 1-99 tanques) at each shift close.
 
 ### Layer 3: Strategy (Intelligence & Machine Learning)
 - **Reconciliation:** The `TOTAL SALE` in `P` and `S` files must match the aggregate sum of individual transactions in `VE` and credit/debit records in `C`.
@@ -68,7 +68,7 @@ The system maintains a `station_knowledge` table (JSONB per station) to:
 | Frontend | React 19 + TypeScript 5.8 + Vite 6 |
 | Estilos | TailwindCSS (dark mode class-based) |
 | Backend/DB | Supabase (PostgreSQL + Realtime + Auth) |
-| Edge Agent | Python 3.11+ (watchdog, httpx, pydantic) |
+| Edge Agent | Python 3.11+ (watchdog, httpx, tenacity, PyYAML) |
 | Cloud Logic | Google Cloud Functions (Python 3.11) |
 | Mapas | Leaflet + React-Leaflet |
 | Gráficos | Recharts |
@@ -81,24 +81,30 @@ The system maintains a `station_knowledge` table (JSONB per station) to:
 ## 8. Arquitectura del Sistema
 
 ```
-D:\SVAPP\<station_code>\*.TXT   ← legacy VB system writes files here
-        ↓ (watchdog FileSystemEventHandler)
+C:\SVAPP\*.TXT                  ← legacy VB system writes files here
+        ↓ (watchdog FileSystemEventHandler + debounce 2s)
 edge_agent/watcher.py           ← detects new/modified .TXT files
         ↓ (MD5 idempotency check via state.json)
 edge_agent/parsers/             ← VEParser, CParser, TParser, PParser, SParser
         ↓ (ParseResult: records + errors + raw_file)
 edge_agent/uploader.py          ← POST to Supabase REST (service_role key)
         ↓
-Supabase PostgreSQL              ← sales_transactions, tank_levels, card_payments, daily_closings
-        ↓ (Supabase Edge Function webhook)
-cloud_logic/reconciler          ← P+S totals vs VE sum cross-check
-cloud_logic/anomaly_detector    ← negative values, cash variance >1%, low tanks
-        ↓ (INSERT into alerts table)
+Supabase PostgreSQL             ← sales_transactions, tank_levels, card_payments, daily_closings
+        ↓
 Supabase Realtime               ← postgres_changes channel → React frontend
         ↓
-DataContext.tsx                 ← single source of truth
+DataContext.tsx                 ← single source of truth (carga inicial + suscripciones)
         ↓
-React Components                ← MapBoard (60 stations), AlertsView, ReconciliationView, etc.
+React Components                ← MapBoard, PlayaView, ShopView, SalesHistoryView, etc.
+
+--- Loop de Refresh (botón "Actualizar Datos") ---
+React (App.tsx)                 → INSERT scan_requests (status=pending)
+        ↓
+edge_agent/watcher.py           ← polls scan_requests cada 15s
+        ↓ (detecta pending → re-escanea C:\SVAPP)
+edge_agent/uploader.py          → PATCH scan_requests (status=completed)
+        ↓
+React (App.tsx)                 ← polls hasta completed → toast + refreshData()
 ```
 
 ---
@@ -107,18 +113,26 @@ React Components                ← MapBoard (60 stations), AlertsView, Reconcil
 
 | Archivo | Responsabilidad |
 |---|---|
-| `edge_agent/watcher.py` | Monitor D:\SVAPP, dispatch a parsers, gestionar state.json |
-| `edge_agent/uploader.py` | POST autenticado a Supabase REST, idempotencia por MD5 |
+| `edge_agent/watcher.py` | Monitor C:\SVAPP, dispatch a parsers, state.json, poll scan_requests cada 15s |
+| `edge_agent/uploader.py` | POST a Supabase REST, idempotencia, check/update scan_requests |
+| `edge_agent/service.py` | Windows Service wrapper con watcher auto-recuperable |
 | `edge_agent/parsers/base_parser.py` | Clase abstracta ParseResult + detección de encoding |
-| `edge_agent/parsers/ve_parser.py` | Parser más complejo — líneas de venta fija VE*.TXT |
-| `edge_agent/config.yaml` | supabase_url, watch_path, station_mappings |
-| `cloud_logic/reconciler/main.py` | GCF: reconciliar totales declarados vs suma VE |
-| `cloud_logic/anomaly_detector/main.py` | GCF: detectar anomalías por regla |
-| `models/schema.sql` | Esquema SQL canónico (mirror de migrations/) |
+| `edge_agent/parsers/ve_parser.py` | Parser VE*.TXT — ventas con turno + area_code + timezone -03:00 |
+| `edge_agent/parsers/p_parser.py` | Parser P*.TXT — totales playa (forecourt) con turno |
+| `edge_agent/parsers/s_parser.py` | Parser S*.TXT — totales salon (shop) con turno |
+| `edge_agent/parsers/t_parser.py` | Parser T*.TXT — tanques dinámicos TQ1-TQ99, año 2/4 dígitos |
+| `edge_agent/parsers/c_parser.py` | Parser C*.TXT — cuentas corrientes y tarjetas |
+| `edge_agent/config.yaml` | supabase_url, watch_path, station_id, max_file_size |
+| `edge_agent/setup.ps1` | Instalador automático (3 preguntas, no duplica estaciones) |
 | `context/DataContext.tsx` | Estado global React + real-time subscriptions |
-| `utils/mappers.ts` | DB snake_case ↔ App camelCase (REESCRITO para Station-OS) |
+| `utils/mappers.ts` | DB snake_case ↔ App camelCase — incluye turno/area_code |
+| `utils/dateUtils.ts` | `getArgentinaToday()` — SIEMPRE usar para fechas en frontend |
 | `utils/supabaseHelpers.ts` | CRUD genérico — NO MODIFICAR |
-| `types.ts` | Interfaces TypeScript del dominio gas station |
+| `types.ts` | Interfaces TypeScript + TankId dinámico + turno/areaCode |
+| `types/dbRows.ts` | Mirror de columnas SQL para mappers |
+| `components/TurnoFilter.tsx` | Filtro Mañana(6-14)/Tarde(14-22)/Noche(22-6) + `getTurnoFromTs()` |
+| `components/PlayaView.tsx` | Datos P files + fallback VE, filtro turno |
+| `components/ShopView.tsx` | Datos S files + fallback VE, filtro turno |
 | `constants.ts` | MAP_CENTER, PRODUCT_CODES, ALERT_LEVELS, PAYMENT_METHODS |
 
 ---
@@ -131,10 +145,11 @@ React Components                ← MapBoard (60 stations), AlertsView, Reconcil
 | `stations` | 60 estaciones de servicio |
 | `employees` | Operadores por estación |
 | `operator_auth` | auth.uid() → employee_id + station_id |
-| `sales_transactions` | Cada línea de VE*.TXT procesada |
+| `sales_transactions` | Cada línea de VE*.TXT — incluye `turno` y `area_code` (1=playa, 0=salon) |
 | `card_payments` | Cada línea de C*.TXT procesada |
-| `tank_levels` | Niveles TQ1-TQ5 de T*.TXT |
-| `daily_closings` | Totales P+S + estado de reconciliación |
+| `tank_levels` | Niveles TQ1-TQ99 de T*.TXT (dinámico, CHECK regex) |
+| `daily_closings` | Totales P+S por turno. UNIQUE: `(station_id, shift_date, turno)` |
+| `scan_requests` | Pedidos de refresh desde dashboard. Edge agent polls cada 15s |
 | `alerts` | Alertas CRITICAL/WARNING/INFO generadas |
 | `station_knowledge` | JSONB de aprendizaje por estación |
 | `notifications` | Notificaciones UI (sin cambios) |
@@ -196,6 +211,36 @@ className="... shrink-0"                      // header + footer
 className="... overflow-y-auto"               // body
 ```
 
+### Timezone Argentina — CRÍTICO
+- **Frontend:** SIEMPRE usar `getArgentinaToday()` de `utils/dateUtils.ts` para "hoy".
+- **NUNCA** usar `new Date().toISOString().slice(0,10)` — devuelve UTC, 3 horas adelantado después de las 21hs Argentina.
+- **Parsers Python:** todos los timestamps deben terminar en `-03:00` (hora Argentina).
+- Los archivos VB escriben hora local Argentina, no UTC.
+
+### Turnos por horario — CRÍTICO
+- Los turnos se definen por la hora real del archivo, NO por número secuencial del VB.
+- **Mañana:** 06:00 - 14:00 | **Tarde:** 14:00 - 22:00 | **Noche:** 22:00 - 06:00
+- El cierre del turno noche (22-06) aparece en el archivo del día siguiente.
+- Usar `getTurnoFromTs()` de `components/TurnoFilter.tsx` para clasificar.
+- `area_code`: `1` = playa (forecourt), `0` = salon (shop). Viene del VE parser.
+
+### Tanques dinámicos
+- **NO hardcodear** TQ1-TQ5. Las estaciones pueden tener de 1 a 99 tanques.
+- DB constraint: `CHECK (tank_id ~ '^TQ[0-9]{1,2}$')`.
+- `TankId` en TypeScript es `string`, no union fija.
+- El T parser acepta cualquier número de tanque (valida solo que sea dígito).
+
+### P/S parser — compatibilidad multi-estación
+- El regex de P y S debe aceptar `NR.BCA` con o sin `%` al final: `(?:NR\.BCA\s+%?\d+)?\s*$`
+- Cada estación VB puede tener formatos ligeramente diferentes.
+- Si un parser falla en una estación nueva, comparar el archivo real vs el regex.
+
+### Scan Requests — Botón Refresh del dashboard
+- El dueño toca "Actualizar Datos" → INSERT en `scan_requests` con `status=pending`.
+- El edge agent polls cada 15 segundos. Detecta pending → re-escanea SVAPP → marca `completed`.
+- Dashboard polls cada 3s hasta que `status=completed` o timeout 60s.
+- Solo funciona si el edge agent tiene el código nuevo instalado.
+
 ### Logging en flujos críticos
 - Para **auth** y flujos de ingesta: usar `console.log/error/warn` directo, NO `logger`.
 - `logger` solo imprime cuando `import.meta.env.DEV === true`.
@@ -240,3 +285,49 @@ Cada vez que se detecte un error de parsing o reconciliación que se repita 3+ v
 #### Anomaly Detector — Cap de alertas
 - `MAX_ALERTS_PER_BATCH = 5` evita que un archivo VE corrupto con 500 líneas negativas genere 500 alertas CRITICAL en segundos, colapsando la UI. Las primeras 5 son suficientes para notificar al operador.
 - La idempotencia de alertas (`_insert_alert_idempotent`) verifica por `(station_id, type, related_date, resolved=false)`. Si se re-procesa el mismo archivo, no duplica alertas.
+
+#### T Parser — Formato de fecha variable
+- Los archivos T pueden tener fecha `DD-MM-YY` (2 dígitos de año) o `DD-MM-YYYY` (4 dígitos). El regex usa `\d{2,4}` y `_parse_t_date()` detecta automáticamente con `len(year_part)`.
+- Sin esto, `03-04-2026` se parseaba como `03-04-20` (año 2020) descartando `26`.
+
+#### P/S Parser — Formato NR.BCA variable
+- Matheu: `NR.BCA 520` (sin %). Campana: `NR.BCA %151847` (con %). El regex original no matcheaba el `%` y descartaba TODOS los archivos P/S de Campana silenciosamente.
+- Lección: antes de instalar en una estación nueva, probar los archivos localmente. Cada sistema VB puede tener variantes de formato.
+
+#### Timezone — Todos los timestamps son Argentina (-03:00)
+- Los archivos VB escriben hora local Argentina. Si el parser guarda sin timezone, Supabase interpreta como UTC y el browser resta 3 horas (06:01 → 03:01).
+- Fix: todos los parsers (VE, T, C) agregan `-03:00` al ISO timestamp.
+
+#### PlayaView/ShopView — Independencia de daily_closings
+- Las vistas Playa y Shop NO deben depender exclusivamente de archivos P/S. Si la estación no tiene P/S procesados, deben funcionar con datos de VE como fallback.
+- Fuente primaria: daily_closings (archivos P/S). Fallback: sales_transactions (archivos VE) agrupados por día.
+
+#### setup.ps1 — No duplicar estaciones
+- Antes de crear una estación nueva, buscar si ya existe con `GET stations?owner_email=eq.X&name=eq.Y`. Si existe, reutilizar el UUID. Esto permite reinstalar el edge agent sin crear estaciones duplicadas.
+
+#### Array.from(Map.values()) — Pierde tipos en TypeScript
+- `Array.from(map.values())` devuelve `unknown[]` en lugar del tipo genérico del Map.
+- Usar `[...map.values()]` que preserva el tipo correctamente.
+
+---
+
+## 13. Auto-Actualización de CLAUDE.md
+
+Este archivo es el cerebro del proyecto. Debe mantenerse actualizado:
+
+### Cuándo actualizar
+- Al agregar una **tabla nueva** en Supabase → actualizar § 10.
+- Al agregar un **archivo crítico** → actualizar § 9.
+- Al descubrir un **bug recurrente** que aplica a futuro → agregar en § 12 Lecciones.
+- Al establecer una **convención nueva** (ej: timezone, filtros) → agregar en § 11.
+- Al cambiar la **arquitectura** (nuevo flujo de datos) → actualizar § 8.
+
+### Cómo actualizar
+- Editar directamente este archivo al final de cada sesión de trabajo.
+- Cada lección debe incluir: QUÉ pasó, POR QUÉ falló, y CÓMO se resolvió.
+- No repetir lo que ya está en el código — solo documentar lo NO OBVIO.
+
+### Qué NO poner acá
+- Código — para eso está el código.
+- Estado temporal — para eso está el todo list.
+- Historial de cambios — para eso está git log.
