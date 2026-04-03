@@ -86,11 +86,11 @@ def _map_payment_code(code: int) -> str:
 
 def _parse_ve_date(ddmmyyyy: str, hhmm: str) -> str:
     """
-    Parse VE date format DDMMYYYY + HH:MM → ISO 8601 string.
-    e.g. "30032026" + "00:09" → "2026-03-30T00:09:00"
+    Parse VE date format DDMMYYYY + HH:MM → ISO 8601 with Argentina timezone.
+    e.g. "30032026" + "00:09" → "2026-03-30T00:09:00-03:00"
     """
     dt = datetime.strptime(f"{ddmmyyyy} {hhmm}", "%d%m%Y %H:%M")
-    return dt.isoformat()
+    return dt.isoformat() + "-03:00"
 
 
 class VEParser(BaseParser):

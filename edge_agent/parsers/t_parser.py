@@ -57,14 +57,14 @@ _T_LINE_RE = re.compile(
 
 def _parse_t_date(date_str: str, hhmm: str) -> str:
     """
-    Parse DD-MM-YY or DD-MM-YYYY + HH:MM → ISO 8601.
-    Supports both 2-digit year (legacy) and 4-digit year (current).
+    Parse DD-MM-YY or DD-MM-YYYY + HH:MM → ISO 8601 with Argentina timezone.
+    The times in the files are local Argentina time (UTC-3).
     """
-    # Detect 4-digit vs 2-digit year by length of year part
     year_part = date_str.split("-")[2]
     fmt = "%d-%m-%Y" if len(year_part) == 4 else "%d-%m-%y"
     dt = datetime.strptime(f"{date_str} {hhmm}", f"{fmt} %H:%M")
-    return dt.isoformat()
+    # Files are written in Argentina local time (UTC-3)
+    return dt.isoformat() + "-03:00"
 
 
 class TParser(BaseParser):
