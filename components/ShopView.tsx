@@ -37,7 +37,7 @@ const DayBreakdown: React.FC<{ transactions: SalesTransaction[] }> = ({ transact
         const map = new Map<string, ProductGroup>();
         for (const t of transactions) {
             const code = Number(t.productCode);
-            if (code > 0 && code <= MAX_FUEL_CODE) continue;
+            if (code <= MAX_FUEL_CODE) continue;  // only shop products (code > 20)
 
             const key = t.productName;
             const existing = map.get(key);
@@ -101,12 +101,13 @@ const ShopView: React.FC<ShopViewProps> = ({ stations, salesTransactions, curren
     const daySummaries = useMemo(() => {
         let txs = salesTransactions.filter(t => {
             const code = Number(t.productCode);
-            return !(code > 0 && code <= MAX_FUEL_CODE);  // exclude fuel
+            return code > MAX_FUEL_CODE;  // only shop products (code > 20)
         });
         txs = txs.filter(t => t.shiftDate >= dateFrom && t.shiftDate <= dateTo);
         if (selectedStationId) txs = txs.filter(t => t.stationId === selectedStationId);
 
         const map = new Map<string, DaySummary>();
+        const productSets = new Map<string, Set<string>>();
         for (const t of txs) {
             const key = `${t.stationId}:${t.shiftDate}`;
             const existing = map.get(key);
@@ -122,13 +123,13 @@ const ShopView: React.FC<ShopViewProps> = ({ stations, salesTransactions, curren
                     productCount: 0,
                     txCount: 1,
                 });
+                productSets.set(key, new Set());
             }
+            productSets.get(key)!.add(t.productName);
         }
 
-        // Count distinct products per day
         for (const [key, summary] of map) {
-            const dayTxs = txs.filter(t => `${t.stationId}:${t.shiftDate}` === key);
-            summary.productCount = new Set(dayTxs.map(t => t.productName)).size;
+            summary.productCount = productSets.get(key)?.size ?? 0;
         }
 
         let results = Array.from(map.values());
