@@ -334,7 +334,7 @@ try {
 
 # 6f. Configurar arranque automatico y recuperacion ante fallos
 sc.exe config StationOSEdgeAgent start= auto 2>$null | Out-Null
-sc.exe failure StationOSEdgeAgent reset= 86400 actions= restart/60000/restart/60000/restart/120000 2>$null | Out-Null
+sc.exe failure StationOSEdgeAgent reset= 3600 actions= restart/5000/restart/10000/restart/30000 2>$null | Out-Null
 
 # 6g. Iniciar el servicio
 Write-Host "  Iniciando servicio..." -ForegroundColor Gray
@@ -377,19 +377,19 @@ main(config_path=Path('config.yaml'), stop_event=stop)
 " 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor Gray }
     Pop-Location
     Write-Host "  OK: Archivos existentes procesados." -ForegroundColor Green
-
-    # Crear tarea programada para escanear cada 8 horas (turnos 06:00, 14:00, 22:00)
-    Write-Host "  Configurando escaneo automatico cada 8 horas..." -ForegroundColor Gray
-    $taskAction = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c cd /d C:\StationOS && python -c `"import sys; sys.path.insert(0,'.'); from watcher import main; from pathlib import Path; from threading import Event; import threading; stop=Event(); threading.Timer(120,stop.set).start(); main(config_path=Path('config.yaml'),stop_event=stop)`"" -WorkingDirectory "C:\StationOS"
-    $taskTriggers = @(
-        New-ScheduledTaskTrigger -Daily -At "06:15"
-        New-ScheduledTaskTrigger -Daily -At "14:15"
-        New-ScheduledTaskTrigger -Daily -At "22:15"
-    )
-    $taskSettings = New-ScheduledTaskSettingsSet -StartWhenAvailable -DontStopOnIdleEnd
-    Register-ScheduledTask -TaskName "StationOS-Scan" -Action $taskAction -Trigger $taskTriggers -Settings $taskSettings -User "SYSTEM" -RunLevel Highest -Force -ErrorAction SilentlyContinue | Out-Null
-    Write-Host "  OK: Escaneo automatico a las 06:15, 14:15, 22:15" -ForegroundColor Green
 }
+
+# 6i. Crear tarea programada como red de seguridad (se crea SIEMPRE, no solo si el servicio falla)
+Write-Host "  Configurando escaneo de respaldo (06:15, 14:15, 22:15)..." -ForegroundColor Gray
+$taskAction = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c cd /d C:\StationOS && python -c `"import sys; sys.path.insert(0,'.'); from watcher import main; from pathlib import Path; from threading import Event; import threading; stop=Event(); threading.Timer(180,stop.set).start(); main(config_path=Path('config.yaml'),stop_event=stop)`"" -WorkingDirectory "C:\StationOS"
+$taskTriggers = @(
+    New-ScheduledTaskTrigger -Daily -At "06:15"
+    New-ScheduledTaskTrigger -Daily -At "14:15"
+    New-ScheduledTaskTrigger -Daily -At "22:15"
+)
+$taskSettings = New-ScheduledTaskSettingsSet -StartWhenAvailable -DontStopOnIdleEnd
+Register-ScheduledTask -TaskName "StationOS-Scan" -Action $taskAction -Trigger $taskTriggers -Settings $taskSettings -User "SYSTEM" -RunLevel Highest -Force -ErrorAction SilentlyContinue | Out-Null
+Write-Host "  OK: Escaneo de respaldo configurado" -ForegroundColor Green
 
 # ─── Final Status ─────────────────────────────────────────────────────────────
 

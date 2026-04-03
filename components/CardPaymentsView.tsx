@@ -4,6 +4,7 @@ import { Station, User } from '../types';
 import { PAYMENT_METHOD_LABELS } from '../constants';
 import { useCardPayments } from '../hooks/useCardPayments';
 import StationFilter from './StationFilter';
+import { getArgentinaToday } from '../utils/dateUtils';
 
 interface CardPaymentsViewProps {
     stations: Station[];
@@ -11,8 +12,6 @@ interface CardPaymentsViewProps {
     activeStationId?: string | null;
     onStationChange?: (id: string | null) => void;
 }
-
-const getToday = () => new Date().toISOString().slice(0, 10);
 
 const PAYMENT_TYPE_COLORS: Record<string, string> = {
     CARD:        'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',
@@ -29,8 +28,8 @@ const CardPaymentsView: React.FC<CardPaymentsViewProps> = ({ stations, currentUs
         setSelectedStationId(id);
         onStationChange?.(id);
     };
-    const [dateFrom, setDateFrom] = useState(getToday);
-    const [dateTo, setDateTo]     = useState(getToday);
+    const [dateFrom, setDateFrom] = useState(getArgentinaToday);
+    const [dateTo, setDateTo]     = useState(getArgentinaToday);
     const [filterType, setFilterType] = useState<string>('');
     const [search, setSearch]     = useState('');
 

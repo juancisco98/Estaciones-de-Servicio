@@ -20,6 +20,7 @@ import {
     DbAllowedEmailRow,
 } from '../types/dbRows';
 import { supabase } from '../services/supabaseClient';
+import { getArgentinaToday } from '../utils/dateUtils';
 import {
     dbToStation,
     dbToEmployee,
@@ -111,10 +112,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const loadData = async () => {
         setIsLoading(true);
         try {
-            const dateFrom = new Date();
+            const todayAR = getArgentinaToday();
+            const dateFrom = new Date(todayAR + 'T12:00:00');
             dateFrom.setDate(dateFrom.getDate() - TRANSACTIONS_LOAD_DAYS);
-            const dateCutoff     = dateFrom.toISOString();
-            const dateCutoffDate = dateCutoff.slice(0, 10);
+            const dateCutoffDate = dateFrom.toLocaleDateString('en-CA', { timeZone: 'America/Buenos_Aires' });
 
             const [
                 stationsResult,

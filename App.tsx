@@ -68,6 +68,61 @@ const Dashboard: React.FC = () => {
   const { alerts, resolveAlert }                        = useAlerts();
   const { getStationMetrics, getDailyTimeSeries, getNetworkSummary, getPeriodSummary } = useAnalytics();
 
+  // ── Refresh button (triggers edge agent scan via Supabase) ──
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    if (isRefreshing) return;
+    // Find which station to refresh (active or first)
+    const stationId = activeStationId || stations[0]?.id;
+    if (!stationId) return;
+
+    setIsRefreshing(true);
+    const { toast } = await import('sonner');
+    try {
+      const { generateUUID } = await import('./utils/generateUUID');
+      const requestId = generateUUID();
+      // Insert scan request
+      const { error } = await supabase.from('scan_requests').insert({
+        id: requestId,
+        station_id: stationId,
+        requested_by: currentUser?.email ?? null,
+      });
+      if (error) throw error;
+
+      toast.info('Solicitando actualizacion de datos...');
+
+      // Poll for completion (max 60 seconds)
+      const start = Date.now();
+      const poll = setInterval(async () => {
+        const { data } = await supabase
+          .from('scan_requests')
+          .select('status,files_processed')
+          .eq('id', requestId)
+          .limit(1)
+          .maybeSingle();
+
+        if (data?.status === 'completed') {
+          clearInterval(poll);
+          toast.success(`Datos actualizados (${data.files_processed ?? 0} archivos)`);
+          setIsRefreshing(false);
+          refreshData();
+        } else if (data?.status === 'failed') {
+          clearInterval(poll);
+          toast.error('Error al actualizar datos');
+          setIsRefreshing(false);
+        } else if (Date.now() - start > 60000) {
+          clearInterval(poll);
+          toast.warning('Tiempo agotado. El agente puede no estar activo.');
+          setIsRefreshing(false);
+        }
+      }, 3000);
+    } catch (err) {
+      handleError(err, 'Error al solicitar actualizacion');
+      setIsRefreshing(false);
+    }
+  }, [isRefreshing, activeStationId, stations, currentUser, refreshData]);
+
   // Sync selectedStation with fresh data
   useEffect(() => {
     if (selectedStation) {
@@ -229,6 +284,8 @@ const Dashboard: React.FC = () => {
           criticalAlertCount={criticalAlertCount}
           discrepancyCount={discrepancyCount}
           currentUser={currentUser}
+          onRefresh={handleRefresh}
+          isRefreshing={isRefreshing}
         />
       </div>
 
@@ -245,6 +302,8 @@ const Dashboard: React.FC = () => {
           discrepancyCount={discrepancyCount}
           currentUser={currentUser}
           permanent={true}
+          onRefresh={handleRefresh}
+          isRefreshing={isRefreshing}
         />
       </div>
 

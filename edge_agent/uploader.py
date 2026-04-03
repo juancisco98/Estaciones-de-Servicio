@@ -234,3 +234,52 @@ class SupabaseUploader:
         }
         dead_file.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
         logger.error("Dead letter written: %s", dead_file)
+
+    # ── Scan Requests (dashboard refresh button) ─────────────────────────────
+
+    def check_scan_request(self, station_id: str) -> dict | None:
+        """
+        Check if there's a pending scan request for this station.
+        Returns the request dict if found, None otherwise.
+        """
+        url = f"{self.base_url}/rest/v1/scan_requests"
+        params = {
+            "station_id": f"eq.{station_id}",
+            "status": "eq.pending",
+            "order": "requested_at.asc",
+            "limit": "1",
+        }
+        headers = {**self._headers, "Prefer": "return=representation"}
+        try:
+            resp = httpx.get(url, headers=headers, params=params, timeout=10.0)
+            if resp.status_code == 200:
+                rows = resp.json()
+                return rows[0] if rows else None
+            return None
+        except Exception as exc:
+            logger.debug("scan_requests check failed: %s", exc)
+            return None
+
+    def update_scan_status(
+        self,
+        request_id: str,
+        status: str,
+        files_processed: int = 0,
+        error_message: str | None = None,
+    ) -> None:
+        """Update a scan request's status (processing, completed, failed)."""
+        url = f"{self.base_url}/rest/v1/scan_requests"
+        params = {"id": f"eq.{request_id}"}
+        body: dict[str, Any] = {"status": status}
+        if status in ("completed", "failed"):
+            from datetime import datetime, timezone
+            body["completed_at"] = datetime.now(timezone.utc).isoformat()
+            body["files_processed"] = files_processed
+        if error_message:
+            body["error_message"] = error_message
+        try:
+            httpx.patch(
+                url, json=body, headers=self._headers, params=params, timeout=10.0
+            )
+        except Exception as exc:
+            logger.warning("Could not update scan_request %s: %s", request_id, exc)

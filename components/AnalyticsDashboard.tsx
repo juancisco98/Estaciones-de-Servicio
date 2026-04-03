@@ -3,6 +3,7 @@ import { BarChart3, TrendingUp, Fuel, DollarSign, Gauge } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area, PieChart, Pie, Cell } from 'recharts';
 import { useTheme } from '../context/ThemeContext';
 import { Station, StationMetrics, StationDayMetrics, NetworkSummary, PeriodSummary } from '../types';
+import { getArgentinaToday } from '../utils/dateUtils';
 
 type Period = 'today' | 'week' | 'month' | 'custom';
 
@@ -38,18 +39,17 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     const [customTo, setCustomTo]     = useState('');
     const [selectedStationId, setSelectedStationId] = useState<string>('');
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getArgentinaToday();
 
     const { dateFrom, dateTo } = useMemo(() => {
         if (period === 'today') return { dateFrom: today, dateTo: today };
         if (period === 'week') {
-            const d = new Date();
+            const d = new Date(today + 'T12:00:00');
             d.setDate(d.getDate() - 6);
-            return { dateFrom: d.toISOString().slice(0, 10), dateTo: today };
+            return { dateFrom: d.toLocaleDateString('en-CA', { timeZone: 'America/Buenos_Aires' }), dateTo: today };
         }
         if (period === 'month') {
-            const d = new Date();
-            return { dateFrom: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`, dateTo: today };
+            return { dateFrom: today.slice(0, 8) + '01', dateTo: today };
         }
         return { dateFrom: customFrom || today, dateTo: customTo || today };
     }, [period, customFrom, customTo, today]);

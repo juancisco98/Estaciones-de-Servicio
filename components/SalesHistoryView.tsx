@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { ShoppingCart, Search, Filter, AlertTriangle, TrendingUp } from 'lucide-react';
 import { Station, SalesTransaction, User } from '../types';
 import { PAYMENT_METHOD_LABELS } from '../constants';
+import { getArgentinaToday } from '../utils/dateUtils';
 
 interface SalesHistoryViewProps {
     stations: Station[];
@@ -11,14 +12,12 @@ interface SalesHistoryViewProps {
     onStationChange?: (id: string | null) => void;
 }
 
-const getToday = () => new Date().toISOString().slice(0, 10);
-
 const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ stations, salesTransactions, currentUser, activeStationId, onStationChange }) => {
     const [selectedStation, setSelectedStation] = useState<string>(
         activeStationId ?? currentUser?.stationId ?? (stations[0]?.id ?? '')
     );
-    const [dateFrom, setDateFrom] = useState(getToday);
-    const [dateTo, setDateTo]     = useState(getToday);
+    const [dateFrom, setDateFrom] = useState(getArgentinaToday);
+    const [dateTo, setDateTo]     = useState(getArgentinaToday);
     const [search, setSearch]     = useState('');
 
     const stationMap = useMemo(() => new Map(stations.map(s => [s.id, s.name])), [stations]);

@@ -2,6 +2,7 @@ import React from 'react';
 import { X, MapPin, Fuel, AlertTriangle, ShoppingCart, ChevronRight, User } from 'lucide-react';
 import { Station, Employee, SalesTransaction, Alert } from '../types';
 import { ALERT_LEVEL_COLORS, ALERT_LEVEL_LABELS } from '../constants';
+import { getArgentinaToday } from '../utils/dateUtils';
 
 interface StationCardProps {
     station: Station;
@@ -20,7 +21,7 @@ const StationCard: React.FC<StationCardProps> = ({
     onClose,
     onViewDetails,
 }) => {
-    const today        = new Date().toISOString().slice(0, 10);
+    const today        = getArgentinaToday();
     const todayTx      = salesTransactions.filter(t => t.shiftDate === today);
     const todayRevenue = todayTx.reduce((s, t) => s + t.totalAmount, 0);
     const todayLiters  = todayTx.filter(t => Number(t.productCode) <= 20).reduce((s, t) => s + t.quantity, 0);

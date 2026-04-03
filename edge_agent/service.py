@@ -129,24 +129,32 @@ if _WIN32_AVAILABLE:
         # ── Internal ──────────────────────────────────────────────────────────
 
         def _start_watcher(self) -> None:
-            """Start watcher.main() in a daemon thread."""
+            """Start watcher.main() in a resilient daemon thread that auto-restarts on crash."""
             from watcher import main as run_watcher
 
             config_path = _DEFAULT_CONFIG
 
+            def _resilient_watcher() -> None:
+                while not self._stop_event.is_set():
+                    try:
+                        logger.info("[Service] Watcher starting (config=%s)", config_path)
+                        run_watcher(config_path=config_path, stop_event=self._stop_event)
+                    except Exception as exc:
+                        if self._stop_event.is_set():
+                            break
+                        logger.error("[Service] Watcher crashed: %s. Restarting in 10s...", exc)
+                        servicemanager.LogErrorMsg(
+                            f"{SERVICE_NAME} watcher crashed: {exc}. Auto-restarting in 10s."
+                        )
+                        self._stop_event.wait(10)
+
             self._watcher_thread = threading.Thread(
-                target=run_watcher,
-                kwargs={
-                    "config_path": config_path,
-                    "stop_event":  self._stop_event,
-                },
+                target=_resilient_watcher,
                 name="WatcherThread",
                 daemon=True,
             )
             self._watcher_thread.start()
-            logger.info(
-                "[Service] Watcher thread started (config=%s)", config_path
-            )
+            logger.info("[Service] Resilient watcher thread started")
 
 
 # ── Debug mode (no service, interactive) ─────────────────────────────────────

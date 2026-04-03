@@ -3,6 +3,7 @@ import { ClipboardCheck, Search, AlertTriangle, CheckCircle, Clock, ChevronDown,
 import { Station, DailyClosing, Alert, User, ClosingStatus } from '../types';
 import { CLOSING_STATUS_LABELS, CLOSING_STATUS_COLORS } from '../constants';
 import StationFilter from './StationFilter';
+import { getArgentinaToday } from '../utils/dateUtils';
 
 interface ReconciliationViewProps {
     stations: Station[];
@@ -169,8 +170,12 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({
 }) => {
     const [search, setSearch]       = useState('');
     const [filterStatus, setFilterStatus] = useState<ClosingStatus | 'ALL'>('ALL');
-    const [dateFrom, setDateFrom]   = useState(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
-    const [dateTo, setDateTo]       = useState(new Date().toISOString().slice(0, 10));
+    const [dateFrom, setDateFrom]   = useState(() => {
+        const d = new Date(getArgentinaToday() + 'T12:00:00');
+        d.setDate(d.getDate() - 30);
+        return d.toLocaleDateString('en-CA', { timeZone: 'America/Buenos_Aires' });
+    });
+    const [dateTo, setDateTo]       = useState(getArgentinaToday);
     const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
 
     const stationMap = useMemo(() => new Map(stations.map(s => [s.id, s.name])), [stations]);

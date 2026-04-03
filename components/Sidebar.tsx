@@ -2,7 +2,7 @@ import React from 'react';
 import {
     Map as MapIcon, Fuel, ShoppingCart, Droplets,
     AlertTriangle, BarChart3, Settings, LogOut, X, ClipboardCheck,
-    Gauge, Sun, Moon, CreditCard,
+    Gauge, Sun, Moon, CreditCard, RefreshCw,
 } from 'lucide-react';
 import { User } from '../types';
 import { useTheme } from '../context/ThemeContext';
@@ -30,6 +30,8 @@ interface SidebarProps {
     criticalAlertCount?: number;
     discrepancyCount?: number;
     currentUser?: User | null;
+    onRefresh?: () => void;
+    isRefreshing?: boolean;
 }
 
 interface MenuItem {
@@ -51,6 +53,8 @@ const Sidebar: React.FC<SidebarProps> = ({
     criticalAlertCount = 0,
     discrepancyCount = 0,
     currentUser,
+    onRefresh,
+    isRefreshing = false,
 }) => {
     const { theme, toggleTheme } = useTheme();
 
@@ -159,6 +163,26 @@ const Sidebar: React.FC<SidebarProps> = ({
 
             {/* Footer */}
             <div className="p-5 border-t border-gray-100/80 dark:border-white/5 space-y-3 shrink-0">
+
+                {/* Refresh button */}
+                {onRefresh && (
+                    <button
+                        onClick={onRefresh}
+                        disabled={isRefreshing}
+                        className="w-full flex items-center gap-3.5 px-4 py-3 min-h-[48px] rounded-2xl
+                                   text-amber-600 dark:text-amber-400
+                                   hover:bg-amber-50 dark:hover:bg-amber-500/10
+                                   disabled:opacity-50 disabled:cursor-not-allowed
+                                   transition-all duration-200 active:scale-98"
+                    >
+                        <div className="p-2 rounded-xl text-amber-500 dark:text-amber-400">
+                            <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        </div>
+                        <span className="text-[15px] font-semibold">
+                            {isRefreshing ? 'Actualizando...' : 'Actualizar Datos'}
+                        </span>
+                    </button>
+                )}
 
                 {/* Dark mode toggle */}
                 <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-gray-50/80 dark:bg-slate-800/60">

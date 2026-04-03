@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Fuel, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { Station, DailyClosing, SalesTransaction, User } from '../types';
 import StationFilter from './StationFilter';
+import { getArgentinaToday } from '../utils/dateUtils';
 
 interface PlayaViewProps {
     stations: Station[];
@@ -98,8 +99,8 @@ const DayBreakdown: React.FC<{ transactions: SalesTransaction[] }> = ({ transact
 
 const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, salesTransactions, currentUser, activeStationId, onStationChange }) => {
     const [search, setSearch] = useState('');
-    const [dateFrom, setDateFrom] = useState(new Date().toISOString().slice(0, 10));
-    const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10));
+    const [dateFrom, setDateFrom] = useState(getArgentinaToday);
+    const [dateTo, setDateTo] = useState(getArgentinaToday);
     const [selectedStationId, setSelectedStationId] = useState<string | null>(activeStationId ?? null);
     const [expandedId, setExpandedId] = useState<string | null>(null);
 

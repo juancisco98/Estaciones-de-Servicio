@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Activity, AlertTriangle, Fuel, DollarSign, Gauge, TrendingUp, MapPin } from 'lucide-react';
 import { Station, Alert, DailyClosing, StationMetrics } from '../types';
 import { CLOSING_STATUS_COLORS, CLOSING_STATUS_LABELS } from '../constants';
+import { getArgentinaToday } from '../utils/dateUtils';
 
 interface LiveDashboardViewProps {
     stations: Station[];
@@ -10,8 +11,6 @@ interface LiveDashboardViewProps {
     getStationMetrics: (stationId: string, dateFrom: string, dateTo: string) => StationMetrics;
     onViewOnMap: (station: Station) => void;
 }
-
-const getToday = () => new Date().toISOString().slice(0, 10);
 
 const KpiCard: React.FC<{ label: string; value: string | number; sub?: string; icon: React.ReactNode; colorClass: string; glowColor?: string }> = ({
     label, value, sub, icon, colorClass, glowColor,
@@ -123,7 +122,7 @@ const LiveDashboardView: React.FC<LiveDashboardViewProps> = ({
 }) => {
     const activeStations = stations.filter(s => s.isActive);
 
-    const todayStr = getToday();
+    const todayStr = getArgentinaToday();
     const metricsMap = useMemo(() => {
         const map = new Map<string, StationMetrics>();
         for (const s of activeStations) {

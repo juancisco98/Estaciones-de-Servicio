@@ -358,8 +358,29 @@ def main(config_path: Path = _DEFAULT_CONFIG, stop_event: Event | None = None) -
     logger.info("Press Ctrl+C to stop.")
 
     try:
+        poll_counter = 0
         while stop_event is None or not stop_event.is_set():
             time.sleep(1)
+            poll_counter += 1
+            # Every 15 seconds, check for dashboard refresh requests
+            if poll_counter >= 15:
+                poll_counter = 0
+                try:
+                    pending = uploader.check_scan_request(station_id)
+                    if pending:
+                        req_id = pending["id"]
+                        logger.info("Scan request %s received, processing...", req_id[:8])
+                        uploader.update_scan_status(req_id, "processing")
+                        scan_files = list(set(
+                            glob.glob(str(watch_root / "*.TXT")) +
+                            glob.glob(str(watch_root / "*.txt"))
+                        ))
+                        for fpath in sorted(scan_files):
+                            process_file(fpath, station_id, state, uploader)
+                        uploader.update_scan_status(req_id, "completed", len(scan_files))
+                        logger.info("Scan request %s completed: %d files scanned", req_id[:8], len(scan_files))
+                except Exception as exc:
+                    logger.debug("Scan request poll error: %s", exc)
     except KeyboardInterrupt:
         logger.info("Shutdown requested...")
     finally:
