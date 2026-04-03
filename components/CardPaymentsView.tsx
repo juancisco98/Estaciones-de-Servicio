@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { CreditCard, Search, TrendingUp } from 'lucide-react';
-import { Station, User } from '../types';
+import { CreditCard, Search, TrendingUp, Download } from 'lucide-react';
+import { Station, User, CardPayment } from '../types';
 import { PAYMENT_METHOD_LABELS } from '../constants';
 import { useCardPayments } from '../hooks/useCardPayments';
 import StationFilter from './StationFilter';
 import { getArgentinaToday } from '../utils/dateUtils';
+import { exportToCsv } from '../utils/exportCsv';
 
 interface CardPaymentsViewProps {
     stations: Station[];
@@ -71,6 +72,26 @@ const CardPaymentsView: React.FC<CardPaymentsViewProps> = ({ stations, currentUs
                 <div className="flex items-center gap-3 mb-5">
                     <CreditCard className="w-6 h-6 text-violet-500" />
                     <h1 className="text-2xl font-black text-gray-900 dark:text-white">Cuentas Corrientes</h1>
+                    <button
+                        onClick={() => exportToCsv<CardPayment>(
+                            `cuentas_corrientes_${dateFrom}_${dateTo}.csv`,
+                            [
+                                { header: 'Fecha', value: (p: CardPayment) => p.shiftDate ?? '' },
+                                { header: 'Estacion', value: (p: CardPayment) => stationMap.get(p.stationId) ?? '' },
+                                { header: 'Tipo', value: (p: CardPayment) => PAYMENT_METHOD_LABELS[p.paymentType] ?? p.paymentType },
+                                { header: 'Cuenta/Nombre', value: (p: CardPayment) => p.accountName ?? '' },
+                                { header: 'Monto', value: (p: CardPayment) => p.amount },
+                                { header: 'Referencia', value: (p: CardPayment) => p.referenceCode ?? '' },
+                                { header: 'Archivo', value: (p: CardPayment) => p.fileName },
+                            ],
+                            filtered,
+                        )}
+                        disabled={filtered.length === 0}
+                        className="ml-auto p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-500/30 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        title="Exportar CSV"
+                    >
+                        <Download className="w-5 h-5" />
+                    </button>
                 </div>
 
                 {/* Filters */}

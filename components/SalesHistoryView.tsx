@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { ShoppingCart, Search, Filter, AlertTriangle, TrendingUp } from 'lucide-react';
+import { ShoppingCart, Search, Filter, AlertTriangle, TrendingUp, Download } from 'lucide-react';
 import { Station, SalesTransaction, User } from '../types';
 import { PAYMENT_METHOD_LABELS } from '../constants';
 import { getArgentinaToday } from '../utils/dateUtils';
+import { exportToCsv } from '../utils/exportCsv';
 import TurnoFilter, { Turno, getTurnoFromTs } from './TurnoFilter';
 
 interface SalesHistoryViewProps {
@@ -51,6 +52,27 @@ const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ stations, salesTran
                 <div className="flex items-center gap-3 mb-5">
                     <ShoppingCart className="w-6 h-6 text-amber-500" />
                     <h1 className="text-2xl font-black text-gray-900 dark:text-white">Historial de Ventas</h1>
+                    <button
+                        onClick={() => exportToCsv<SalesTransaction>(
+                            `ventas_${dateFrom}_${dateTo}.csv`,
+                            [
+                                { header: 'Fecha/Hora', value: (t: SalesTransaction) => t.transactionTs.replace('T', ' ').slice(0, 16) },
+                                { header: 'Estacion', value: (t: SalesTransaction) => stationMap.get(t.stationId) ?? '' },
+                                { header: 'Producto', value: (t: SalesTransaction) => t.productName },
+                                { header: 'Codigo', value: (t: SalesTransaction) => t.productCode },
+                                { header: 'Cantidad', value: (t: SalesTransaction) => t.quantity },
+                                { header: 'Total', value: (t: SalesTransaction) => t.totalAmount },
+                                { header: 'Pago', value: (t: SalesTransaction) => PAYMENT_METHOD_LABELS[t.paymentMethod ?? ''] ?? t.paymentMethod ?? '' },
+                                { header: 'Archivo', value: (t: SalesTransaction) => t.fileName },
+                            ],
+                            filtered,
+                        )}
+                        disabled={filtered.length === 0}
+                        className="ml-auto p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-500/30 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        title="Exportar CSV"
+                    >
+                        <Download className="w-5 h-5" />
+                    </button>
                 </div>
 
                 {/* Filters */}
