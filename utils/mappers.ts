@@ -33,6 +33,7 @@ import {
   ProductType,
   AccountType,
   AllowedEmail,
+  OwnerPreferences,
 } from '../types';
 
 import {
@@ -46,6 +47,7 @@ import {
   DbNotificationRow,
   DbStationKnowledgeRow,
   DbAllowedEmailRow,
+  DbOwnerPreferencesRow,
 } from '../types/dbRows';
 
 // ─── STATION ─────────────────────────────────────────────────────────────────
@@ -359,6 +361,42 @@ export const dbToStationKnowledge = (row: DbStationKnowledgeRow): StationKnowled
     },
   };
 };
+
+// ─── ALLOWED EMAIL ───────────────────────────────────────────────────────────
+
+// ─── OWNER PREFERENCES ──────────────────────────────────────────────────────
+
+export const dbToOwnerPreferences = (row: DbOwnerPreferencesRow): OwnerPreferences => ({
+  id:                    row.id,
+  ownerEmail:            row.owner_email,
+  stationId:             row.station_id ?? undefined,
+  notifyTankLow:         row.notify_tank_low,
+  notifyTankCritical:    row.notify_tank_critical,
+  notifyNegativeValue:   row.notify_negative_value,
+  notifyReconciliation:  row.notify_reconciliation,
+  tankWarningLiters:     row.tank_warning_liters,
+  tankCriticalLiters:    row.tank_critical_liters,
+  shiftMorningStart:     row.shift_morning_start,
+  shiftAfternoonStart:   row.shift_afternoon_start,
+  shiftNightStart:       row.shift_night_start,
+  createdAt:             row.created_at,
+  updatedAt:             row.updated_at,
+});
+
+export const ownerPreferencesToDb = (p: OwnerPreferences): Record<string, unknown> => ({
+  id:                      p.id,
+  owner_email:             p.ownerEmail,
+  station_id:              p.stationId ?? null,
+  notify_tank_low:         p.notifyTankLow,
+  notify_tank_critical:    p.notifyTankCritical,
+  notify_negative_value:   p.notifyNegativeValue,
+  notify_reconciliation:   p.notifyReconciliation,
+  tank_warning_liters:     p.tankWarningLiters,
+  tank_critical_liters:    p.tankCriticalLiters,
+  shift_morning_start:     p.shiftMorningStart,
+  shift_afternoon_start:   p.shiftAfternoonStart,
+  shift_night_start:       p.shiftNightStart,
+});
 
 // ─── ALLOWED EMAIL ───────────────────────────────────────────────────────────
 

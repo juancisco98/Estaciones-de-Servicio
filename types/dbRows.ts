@@ -156,6 +156,23 @@ export interface DbStationKnowledgeRow {
   last_updated: string;
 }
 
+export interface DbOwnerPreferencesRow {
+  id: string;
+  owner_email: string;
+  station_id?: string | null;
+  notify_tank_low: boolean;
+  notify_tank_critical: boolean;
+  notify_negative_value: boolean;
+  notify_reconciliation: boolean;
+  tank_warning_liters: number;
+  tank_critical_liters: number;
+  shift_morning_start: number;
+  shift_afternoon_start: number;
+  shift_night_start: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface DbNotificationRow {
   id: string;
   recipient_email: string;

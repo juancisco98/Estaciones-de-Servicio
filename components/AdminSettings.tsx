@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Settings, Plus, Gauge, ChevronDown, ChevronUp, Power, AlertTriangle, Loader2, Users, Trash2, Building2 } from 'lucide-react';
+import { Settings, Plus, Gauge, ChevronDown, ChevronUp, Power, AlertTriangle, Loader2, Users, Trash2, Building2, Bell, Droplets } from 'lucide-react';
 import { Station, Employee, User } from '../types';
+import { useOwnerPreferences } from '../hooks/useOwnerPreferences';
 import { EMPLOYEE_ROLE_LABELS } from '../constants';
 import KnowledgePanelSection from './KnowledgePanelSection';
 import StationFormModal from './StationFormModal';
@@ -35,6 +36,7 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
     const [assigningOwnerEmail, setAssigningOwnerEmail] = useState<string | null>(null);
 
     const { allowedEmails, addOwner, removeOwner, getStationCountByOwner, getStationsByOwner, getUnassignedStations } = useAllowedEmails();
+    const { preferences, savePreferences } = useOwnerPreferences(currentUser?.email);
     const { saveStation: updateStationOwner } = useStations();
 
     // Check if current user is superadmin
@@ -301,6 +303,97 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
                 {/* ── CONOCIMIENTO DE ESTACIÓN ── */}
                 {currentUser?.role === 'ADMIN' && (
                     <KnowledgePanelSection stations={stations} isAdmin={true} />
+                )}
+
+                {/* Notifications + Thresholds */}
+                {preferences && (
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-white/10 p-6 space-y-6">
+                        <div className="flex items-center gap-2">
+                            <Bell className="w-5 h-5 text-amber-500" />
+                            <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Notificaciones</p>
+                        </div>
+                        <div className="space-y-3">
+                            {([
+                                { key: 'notifyTankCritical' as const, label: 'Tanque critico', desc: 'Cuando un tanque baja del nivel critico' },
+                                { key: 'notifyTankLow' as const, label: 'Tanque bajo', desc: 'Cuando un tanque baja del nivel de advertencia' },
+                                { key: 'notifyNegativeValue' as const, label: 'Venta negativa', desc: 'Cuando se detecta una anulacion o devolucion' },
+                                { key: 'notifyReconciliation' as const, label: 'Faltante de caja', desc: 'Cuando el total declarado no coincide con las ventas' },
+                            ]).map(({ key, label, desc }) => (
+                                <div key={key} className="flex items-center justify-between py-2">
+                                    <div>
+                                        <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">{label}</p>
+                                        <p className="text-xs text-gray-400 dark:text-slate-500">{desc}</p>
+                                    </div>
+                                    <button
+                                        onClick={() => savePreferences({ [key]: !preferences[key] })}
+                                        className={`relative w-11 h-6 rounded-full transition-colors ${
+                                            preferences[key] ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-slate-600'
+                                        }`}
+                                    >
+                                        <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${
+                                            preferences[key] ? 'left-[22px]' : 'left-0.5'
+                                        }`} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="border-t border-gray-100 dark:border-white/10 pt-5">
+                            <div className="flex items-center gap-2 mb-4">
+                                <Droplets className="w-5 h-5 text-blue-500" />
+                                <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Umbrales de tanques</p>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs font-semibold text-orange-600 dark:text-orange-400 block mb-1">
+                                        Advertencia (litros)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={preferences.tankWarningLiters}
+                                        onChange={e => savePreferences({ tankWarningLiters: Number(e.target.value) || 800 })}
+                                        className="w-full px-4 py-2.5 rounded-xl bg-gray-100 dark:bg-slate-800 border border-transparent text-gray-800 dark:text-white text-sm focus:outline-none focus:border-orange-400"
+                                    />
+                                    <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-1">Alerta WARNING si stock menor a este valor</p>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-red-600 dark:text-red-400 block mb-1">
+                                        Critico (litros)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={preferences.tankCriticalLiters}
+                                        onChange={e => savePreferences({ tankCriticalLiters: Number(e.target.value) || 300 })}
+                                        className="w-full px-4 py-2.5 rounded-xl bg-gray-100 dark:bg-slate-800 border border-transparent text-gray-800 dark:text-white text-sm focus:outline-none focus:border-red-400"
+                                    />
+                                    <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-1">Alerta CRITICAL si stock menor a este valor</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="border-t border-gray-100 dark:border-white/10 pt-5">
+                            <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-4">Horarios de turno</p>
+                            <div className="grid grid-cols-3 gap-3">
+                                {([
+                                    { key: 'shiftMorningStart' as const, label: 'Manana', color: 'text-amber-500' },
+                                    { key: 'shiftAfternoonStart' as const, label: 'Tarde', color: 'text-orange-500' },
+                                    { key: 'shiftNightStart' as const, label: 'Noche', color: 'text-indigo-500' },
+                                ]).map(({ key, label, color }) => (
+                                    <div key={key}>
+                                        <label className={`text-xs font-semibold ${color} block mb-1`}>{label} (hora inicio)</label>
+                                        <input
+                                            type="number"
+                                            min={0} max={23}
+                                            value={preferences[key]}
+                                            onChange={e => savePreferences({ [key]: Number(e.target.value) })}
+                                            className="w-full px-3 py-2 rounded-xl bg-gray-100 dark:bg-slate-800 border border-transparent text-gray-800 dark:text-white text-sm text-center focus:outline-none focus:border-amber-400"
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                            <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-2">Estos horarios se usan para el filtro de turno en Playa, Salon y Ventas</p>
+                        </div>
+                    </div>
                 )}
 
                 {/* System info */}

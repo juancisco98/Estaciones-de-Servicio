@@ -10,10 +10,7 @@ Triggered by watcher.py after each upload. Routes to file-type checks:
 from __future__ import annotations
 
 import logging
-import uuid
-from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Any
 
 try:
     from .parsers.base_parser import ParseResult
@@ -53,7 +50,56 @@ class AlertChecker:
 
     # ── Tank level alerts ────────────────────────────────────────────────────
 
+    def _get_owner_thresholds(self, station_id: str) -> tuple[int, int]:
+        """Fetch owner-configured tank thresholds, fallback to defaults."""
+        url = f"{self.uploader.base_url}/rest/v1/owner_preferences"
+        params = {
+            "select": "tank_warning_liters,tank_critical_liters",
+            "limit": "1",
+        }
+        # Try station-specific first, then global
+        for sid_filter in [f"eq.{station_id}", "is.null"]:
+            params["station_id"] = sid_filter
+            headers = {**self.uploader._headers, "Prefer": "return=representation"}
+            try:
+                resp = self.uploader._http_get(url, params, headers)
+                if resp:
+                    return (
+                        int(resp[0].get("tank_warning_liters", TANK_WARNING_LITERS)),
+                        int(resp[0].get("tank_critical_liters", TANK_CRITICAL_LITERS)),
+                    )
+            except Exception:
+                pass
+        return (TANK_WARNING_LITERS, TANK_CRITICAL_LITERS)
+
+    def _is_notification_enabled(self, station_id: str, alert_type: str) -> bool:
+        """Check if owner has this notification type enabled."""
+        type_to_field = {
+            "LOW_TANK_LEVEL": "notify_tank_low",
+            "CRITICAL_TANK_LEVEL": "notify_tank_critical",
+            "NEGATIVE_VALUE": "notify_negative_value",
+            "RECONCILIATION_FAIL": "notify_reconciliation",
+        }
+        field = type_to_field.get(alert_type)
+        if not field:
+            return True  # Unknown type → always notify
+
+        url = f"{self.uploader.base_url}/rest/v1/owner_preferences"
+        params = {"select": field, "station_id": "is.null", "limit": "1"}
+        headers = {**self.uploader._headers, "Prefer": "return=representation"}
+        try:
+            resp = self.uploader._http_get(url, params, headers)
+            if resp:
+                return bool(resp[0].get(field, True))
+        except Exception:
+            pass
+        return True  # On error → default to enabled
+
     def _check_tank_levels(self, result: ParseResult, station_id: str) -> None:
+        if not self._is_notification_enabled(station_id, "LOW_TANK_LEVEL"):
+            return
+
+        warning_liters, critical_liters = self._get_owner_thresholds(station_id)
         shift_date = None
         alerts_created = 0
 
@@ -63,7 +109,7 @@ class AlertChecker:
             level = float(Decimal(str(level_str)))
             shift_date = record.get("recorded_at", "")[:10] if not shift_date else shift_date
 
-            if level < TANK_CRITICAL_LITERS:
+            if level < critical_liters:
                 if alerts_created >= MAX_ALERTS_PER_FILE:
                     break
                 if self._alert_exists(station_id, "CRITICAL_TANK_LEVEL", shift_date):
@@ -74,16 +120,16 @@ class AlertChecker:
                     alert_type="CRITICAL_TANK_LEVEL",
                     title=f"{tank_id} nivel critico: {int(level)} L",
                     message=f"Tanque {tank_id} tiene {int(level)} litros. "
-                            f"Umbral critico: {TANK_CRITICAL_LITERS} L. Pedir cisterna urgente.",
+                            f"Umbral critico: {critical_liters} L. Pedir cisterna urgente.",
                     related_date=shift_date,
                     related_file=result.file_name,
                     metadata={"tank_id": tank_id, "level_liters": level,
-                              "threshold": TANK_CRITICAL_LITERS,
+                              "threshold": critical_liters,
                               "product_name": record.get("product_name", "")},
                 )
                 alerts_created += 1
 
-            elif level < TANK_WARNING_LITERS:
+            elif level < warning_liters:
                 if alerts_created >= MAX_ALERTS_PER_FILE:
                     break
                 if self._alert_exists(station_id, "LOW_TANK_LEVEL", shift_date):
@@ -94,11 +140,11 @@ class AlertChecker:
                     alert_type="LOW_TANK_LEVEL",
                     title=f"{tank_id} nivel bajo: {int(level)} L",
                     message=f"Tanque {tank_id} tiene {int(level)} litros. "
-                            f"Umbral: {TANK_WARNING_LITERS} L. Considerar reposicion.",
+                            f"Umbral: {warning_liters} L. Considerar reposicion.",
                     related_date=shift_date,
                     related_file=result.file_name,
                     metadata={"tank_id": tank_id, "level_liters": level,
-                              "threshold": TANK_WARNING_LITERS,
+                              "threshold": warning_liters,
                               "product_name": record.get("product_name", "")},
                 )
                 alerts_created += 1
@@ -106,6 +152,8 @@ class AlertChecker:
     # ── Negative quantity alerts ─────────────────────────────────────────────
 
     def _check_negative_quantities(self, result: ParseResult, station_id: str) -> None:
+        if not self._is_notification_enabled(station_id, "NEGATIVE_VALUE"):
+            return
         alerts_created = 0
 
         for record in result.records:
@@ -145,6 +193,8 @@ class AlertChecker:
         After P or S file: compare declared total against sum of VE transactions.
         Only alerts if both declared total and VE data exist for the same date.
         """
+        if not self._is_notification_enabled(station_id, "RECONCILIATION_FAIL"):
+            return
         if not result.records:
             return
 

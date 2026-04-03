@@ -139,6 +139,25 @@ export interface DailyClosing {
   updatedAt?: string;
 }
 
+// ── OWNER PREFERENCES ──
+
+export interface OwnerPreferences {
+  id: string;
+  ownerEmail: string;
+  stationId?: string;               // null = global for all stations
+  notifyTankLow: boolean;
+  notifyTankCritical: boolean;
+  notifyNegativeValue: boolean;
+  notifyReconciliation: boolean;
+  tankWarningLiters: number;
+  tankCriticalLiters: number;
+  shiftMorningStart: number;        // hour (0-23)
+  shiftAfternoonStart: number;
+  shiftNightStart: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 // ── ALERTS ──
 
 export type AlertLevel = 'CRITICAL' | 'WARNING' | 'INFO';
