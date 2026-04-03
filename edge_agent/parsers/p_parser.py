@@ -44,7 +44,7 @@ _P_LINE_RE = re.compile(
     r'(-?[\d,\.]+)\s+'          # [2] amount (decimal, can be negative)
     r'TURNO\s+(\d+)\s+'         # [3] turno
     r'PLAYA\s+(\d+)\s+'         # [4] playa
-    r'NR\.BCA\s+\d+\s*$'        # trailing NR.BCA field (ignored)
+    r'(?:NR\.BCA\s+%?\d+)?\s*$'  # trailing NR.BCA field (optional, may have %)
 )
 
 # The authoritative reconciliation label

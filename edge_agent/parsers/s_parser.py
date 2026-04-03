@@ -37,7 +37,7 @@ _S_LINE_RE = re.compile(
     r'(-?[\d,\.]+)\s+'          # [2] amount
     r'TURNO\s+(\d+)\s+'         # [3] turno
     r'SALON\s+(\d+)\s+'         # [4] salon number (usually 0)
-    r'NR\.BCA\s+\d+\s*$'        # trailing
+    r'(?:NR\.BCA\s+%?\d+)?\s*$'  # trailing (optional, may have %)
 )
 
 _TOTAL_SALE_LABEL = "TOTAL SALE"
