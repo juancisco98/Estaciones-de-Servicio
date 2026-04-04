@@ -3,7 +3,7 @@ import { Fuel, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { Station, DailyClosing, SalesTransaction } from '../types';
 import VeTransactionList from './VeTransactionList';
 import StationFilter from './StationFilter';
-import TurnoFilter, { Turno, getTurnoFromTs } from './TurnoFilter';
+import TurnoFilter, { Turno, getTurnoFromTs, getTurnoFromClosingTs } from './TurnoFilter';
 import { getArgentinaToday } from '../utils/dateUtils';
 
 interface PlayaViewProps {
@@ -73,7 +73,7 @@ const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, salesTra
             .filter(c => c.forecourtTotal != null)
             .filter(c => c.shiftDate >= dateFrom && c.shiftDate <= dateTo)
             .filter(c => !selectedStationId || c.stationId === selectedStationId)
-            .filter(c => !selectedTurno || !c.pClosingTs || getTurnoFromTs(c.pClosingTs) === selectedTurno)
+            .filter(c => !selectedTurno || !c.pClosingTs || getTurnoFromClosingTs(c.pClosingTs) === selectedTurno)
             .map(c => ({
                 key: `P:${c.stationId}:${c.shiftDate}:${c.turno ?? 0}`,
                 stationId: c.stationId,
@@ -151,7 +151,7 @@ const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, salesTra
                                         <span className="text-xs text-gray-400 dark:text-slate-500 font-mono ml-2">{row.shiftDate}</span>
                                         {row.closingTs && (
                                             <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 ml-2">
-                                                {getTurnoFromTs(row.closingTs) === 'MANANA' ? 'Mañana' : getTurnoFromTs(row.closingTs) === 'TARDE' ? 'Tarde' : 'Noche'}
+                                                {getTurnoFromClosingTs(row.closingTs) === 'MANANA' ? 'Mañana' : getTurnoFromClosingTs(row.closingTs) === 'TARDE' ? 'Tarde' : 'Noche'}
                                             </span>
                                         )}
                                         <span className="text-[10px] text-gray-300 dark:text-slate-600 ml-2">
@@ -172,7 +172,7 @@ const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, salesTra
                                                 t.stationId === row.stationId &&
                                                 t.shiftDate === row.shiftDate &&
                                                 t.areaCode === 1 &&
-                                                (!row.closingTs || getTurnoFromTs(t.transactionTs) === getTurnoFromTs(row.closingTs))
+                                                (!row.closingTs || getTurnoFromTs(t.transactionTs) === getTurnoFromClosingTs(row.closingTs))
                                             )}
                                         />
                                     </>

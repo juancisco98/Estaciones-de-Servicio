@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Banknote, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { Station, CashClosing } from '../types';
 import StationFilter from './StationFilter';
-import TurnoFilter, { Turno, getTurnoFromTs } from './TurnoFilter';
+import TurnoFilter, { Turno, getTurnoFromClosingTs } from './TurnoFilter';
 import { getArgentinaToday } from '../utils/dateUtils';
 
 interface CajaViewProps {
@@ -33,7 +33,7 @@ const CajaView: React.FC<CajaViewProps> = ({ stations, cashClosings, activeStati
         let results = cashClosings
             .filter(c => c.shiftDate >= dateFrom && c.shiftDate <= dateTo)
             .filter(c => !selectedStationId || c.stationId === selectedStationId)
-            .filter(c => !selectedTurno || !c.closingTs || getTurnoFromTs(c.closingTs) === selectedTurno);
+            .filter(c => !selectedTurno || !c.closingTs || getTurnoFromClosingTs(c.closingTs) === selectedTurno);
 
         if (search.trim()) {
             const q = search.toLowerCase();
@@ -101,7 +101,7 @@ const CajaView: React.FC<CajaViewProps> = ({ stations, cashClosings, activeStati
                                         <span className="text-xs text-gray-400 dark:text-slate-500 font-mono ml-2">{row.shiftDate}</span>
                                         {row.closingTs && (
                                             <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 ml-2">
-                                                {getTurnoFromTs(row.closingTs) === 'MANANA' ? 'Mañana' : getTurnoFromTs(row.closingTs) === 'TARDE' ? 'Tarde' : 'Noche'}
+                                                {getTurnoFromClosingTs(row.closingTs) === 'MANANA' ? 'Mañana' : getTurnoFromClosingTs(row.closingTs) === 'TARDE' ? 'Tarde' : 'Noche'}
                                             </span>
                                         )}
                                         <span className="text-[10px] text-gray-300 dark:text-slate-600 ml-2">(archivo A)</span>

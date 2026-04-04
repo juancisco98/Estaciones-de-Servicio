@@ -8,15 +8,29 @@ export const TURNO_LABELS: Record<Turno, string> = {
     NOCHE:  'Noche (22-6)',
 };
 
-/** Given an ISO timestamp, return which shift it belongs to.
- *  Converts UTC to Argentina (UTC-3) manually — no locale dependency.
- *  Argentina has no DST since 2009, so UTC-3 is always correct. */
-export const getTurnoFromTs = (ts: string): Turno => {
+/** Convert UTC timestamp to Argentina hour (UTC-3, no DST since 2009). */
+const getArgHour = (ts: string): number => {
     const d = new Date(ts);
-    const utcHours = d.getUTCHours();
-    const argHour = (utcHours - 3 + 24) % 24;
-    if (argHour >= 6 && argHour < 14) return 'MANANA';
-    if (argHour >= 14 && argHour < 22) return 'TARDE';
+    return (d.getUTCHours() - 3 + 24) % 24;
+};
+
+/** Turno from a VE transaction timestamp (sale time = when it happened). */
+export const getTurnoFromTs = (ts: string): Turno => {
+    const h = getArgHour(ts);
+    if (h >= 6 && h < 14) return 'MANANA';
+    if (h >= 14 && h < 22) return 'TARDE';
+    return 'NOCHE';
+};
+
+/** Turno from a closing file timestamp (P/S/C/T/A file mtime).
+ *  The file is generated at the END of a shift (~14:03 = Mañana closing).
+ *  Subtracts 30min to classify into the shift that just ended. */
+export const getTurnoFromClosingTs = (ts: string): Turno => {
+    const d = new Date(ts);
+    d.setMinutes(d.getMinutes() - 30);
+    const h = (d.getUTCHours() - 3 + 24) % 24;
+    if (h >= 6 && h < 14) return 'MANANA';
+    if (h >= 14 && h < 22) return 'TARDE';
     return 'NOCHE';
 };
 
