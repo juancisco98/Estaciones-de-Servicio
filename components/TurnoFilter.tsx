@@ -8,9 +8,13 @@ export const TURNO_LABELS: Record<Turno, string> = {
     NOCHE:  'Noche (22-6)',
 };
 
-/** Given an ISO timestamp, return which shift it belongs to. */
+/** Given an ISO timestamp, return which shift it belongs to.
+ *  Extracts the hour directly from the ISO string (already Argentina time)
+ *  instead of using Date.getHours() which converts to browser timezone. */
 export const getTurnoFromTs = (ts: string): Turno => {
-    const hour = new Date(ts).getHours();
+    // Extract hour from "...THH:MM..." — the timestamp is already in Argentina time (-03:00)
+    const match = ts.match(/T(\d{2}):/);
+    const hour = match ? parseInt(match[1], 10) : new Date(ts).getHours();
     if (hour >= 6 && hour < 14) return 'MANANA';
     if (hour >= 14 && hour < 22) return 'TARDE';
     return 'NOCHE';
