@@ -9,18 +9,14 @@ export const TURNO_LABELS: Record<Turno, string> = {
 };
 
 /** Given an ISO timestamp, return which shift it belongs to.
- *  Always converts to Argentina timezone (America/Buenos_Aires)
- *  because Supabase stores timestamps in UTC (+00). */
+ *  Converts UTC to Argentina (UTC-3) manually — no locale dependency.
+ *  Argentina has no DST since 2009, so UTC-3 is always correct. */
 export const getTurnoFromTs = (ts: string): Turno => {
-    const hour = parseInt(
-        new Date(ts).toLocaleString('en-US', {
-            timeZone: 'America/Buenos_Aires',
-            hour: '2-digit',
-            hour12: false,
-        }), 10
-    );
-    if (hour >= 6 && hour < 14) return 'MANANA';
-    if (hour >= 14 && hour < 22) return 'TARDE';
+    const d = new Date(ts);
+    const utcHours = d.getUTCHours();
+    const argHour = (utcHours - 3 + 24) % 24;
+    if (argHour >= 6 && argHour < 14) return 'MANANA';
+    if (argHour >= 14 && argHour < 22) return 'TARDE';
     return 'NOCHE';
 };
 
