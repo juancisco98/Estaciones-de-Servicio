@@ -172,7 +172,7 @@ const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, salesTrans
                                             transactions={salesTransactions.filter(t =>
                                                 t.stationId === row.stationId &&
                                                 t.shiftDate === row.shiftDate &&
-                                                Number(t.productCode) > 14 &&
+                                                t.areaCode === 0 &&
                                                 (!row.closingTs || getTurnoFromTs(t.transactionTs) === getTurnoFromTs(row.closingTs))
                                             )}
                                         />
