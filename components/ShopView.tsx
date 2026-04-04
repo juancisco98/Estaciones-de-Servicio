@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ShoppingBag, Search, ChevronDown, ChevronUp } from 'lucide-react';
-import { Station, DailyClosing, SalesTransaction, User } from '../types';
+import { Station, DailyClosing } from '../types';
 import StationFilter from './StationFilter';
 import TurnoFilter, { Turno, getTurnoFromTs } from './TurnoFilter';
 import { getArgentinaToday } from '../utils/dateUtils';
@@ -8,21 +8,11 @@ import { getArgentinaToday } from '../utils/dateUtils';
 interface ShopViewProps {
     stations: Station[];
     dailyClosings: DailyClosing[];
-    salesTransactions: SalesTransaction[];
-    currentUser: User | null;
     activeStationId?: string | null;
     onStationChange?: (id: string | null) => void;
 }
 
 const fmt = (n?: number) => n != null ? `$${n.toLocaleString('es-AR', { maximumFractionDigits: 0 })}` : '-';
-
-const MAX_FUEL_CODE = 20;
-
-interface ProductGroup {
-    productName: string;
-    totalAmount: number;
-    count: number;
-}
 
 interface DayRow {
     key: string;
@@ -60,58 +50,7 @@ const SnapshotBreakdown: React.FC<{ snapshot: Record<string, number> }> = ({ sna
     );
 };
 
-const VeBreakdown: React.FC<{ transactions: SalesTransaction[] }> = ({ transactions }) => {
-    const products = useMemo(() => {
-        const map = new Map<string, ProductGroup>();
-        for (const t of transactions) {
-            const code = Number(t.productCode);
-            if (code <= MAX_FUEL_CODE) continue;  // only shop products (code > 20)
-
-            const key = t.productName;
-            const existing = map.get(key);
-            if (existing) {
-                existing.totalAmount += t.totalAmount;
-                existing.count += t.quantity;
-            } else {
-                map.set(key, {
-                    productName: t.productName,
-                    totalAmount: t.totalAmount,
-                    count: t.quantity,
-                });
-            }
-        }
-        return Array.from(map.values()).sort((a, b) => b.totalAmount - a.totalAmount);
-    }, [transactions]);
-
-    const total = products.reduce((s, p) => s + p.totalAmount, 0);
-
-    return (
-        <div className="border-t border-gray-100 dark:border-white/5 px-5 py-4">
-            {products.length > 0 ? (
-                <>
-                    <div className="flex items-center gap-2 mb-2">
-                        <ShoppingBag className="w-4 h-4 text-violet-500" />
-                        <span className="text-xs font-bold text-violet-600 dark:text-violet-400">Productos vendidos</span>
-                        <span className="text-xs text-gray-400 ml-auto">{fmt(total)}</span>
-                    </div>
-                    <div className="space-y-1">
-                        {products.map(p => (
-                            <div key={p.productName} className="flex items-center text-xs px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-slate-800/50">
-                                <span className="font-medium text-gray-700 dark:text-gray-300 flex-1">{p.productName}</span>
-                                <span className="text-gray-400 dark:text-slate-500 mr-4">x{p.count}</span>
-                                <span className="font-bold text-gray-900 dark:text-white w-24 text-right">{fmt(p.totalAmount)}</span>
-                            </div>
-                        ))}
-                    </div>
-                </>
-            ) : (
-                <p className="text-xs text-gray-400 dark:text-slate-500 text-center py-2">Sin productos de tienda para este dia</p>
-            )}
-        </div>
-    );
-};
-
-const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, salesTransactions, currentUser, activeStationId, onStationChange }) => {
+const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, activeStationId, onStationChange }) => {
     const [search, setSearch] = useState('');
     const [dateFrom, setDateFrom] = useState(getArgentinaToday);
     const [dateTo, setDateTo] = useState(getArgentinaToday);
@@ -126,10 +65,9 @@ const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, salesTrans
 
     const stationMap = useMemo(() => new Map(stations.map(s => [s.id, s.name])), [stations]);
 
-    // Build rows: prefer daily_closings (S files) when available, fallback to VE
+    // Build rows ONLY from S files (daily_closings with shopTotal)
     const dayRows = useMemo(() => {
-        // 1. Rows from daily_closings (S files)
-        const sRows: DayRow[] = dailyClosings
+        let results: DayRow[] = dailyClosings
             .filter(c => c.shopTotal != null)
             .filter(c => c.shiftDate >= dateFrom && c.shiftDate <= dateTo)
             .filter(c => !selectedStationId || c.stationId === selectedStationId)
@@ -147,59 +85,6 @@ const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, salesTrans
                 source: 'S' as const,
             }));
 
-        // Track which (station, date) combos have S data
-        const hasSData = new Set(sRows.map(r => `${r.stationId}:${r.shiftDate}`));
-
-        // 2. Fallback: VE transactions for days WITHOUT S files (only non-fuel)
-        const veTxs = salesTransactions
-            .filter(t => Number(t.productCode) > MAX_FUEL_CODE)
-            .filter(t => t.shiftDate >= dateFrom && t.shiftDate <= dateTo)
-            .filter(t => !selectedStationId || t.stationId === selectedStationId)
-            .filter(t => !selectedTurno || getTurnoFromTs(t.transactionTs) === selectedTurno)
-            .filter(t => !hasSData.has(`${t.stationId}:${t.shiftDate}`));
-
-        const veMap = new Map<string, DayRow>();
-        const productSets = new Map<string, Set<string>>();
-        for (const t of veTxs) {
-            const turnoKey = t.turno ?? 0;
-            const key = `VE:${t.stationId}:${t.shiftDate}:${turnoKey}`;
-            const existing = veMap.get(key);
-            if (existing) {
-                existing.total += t.totalAmount;
-                existing.txCount += 1;
-            } else {
-                veMap.set(key, {
-                    key,
-                    stationId: t.stationId,
-                    shiftDate: t.shiftDate,
-                    turno: t.turno ?? undefined,
-                    total: t.totalAmount,
-                    productCount: 0,
-                    txCount: 1,
-                    source: 'VE',
-                });
-                productSets.set(key, new Set());
-            }
-            productSets.get(key)!.add(t.productName);
-        }
-        for (const [key, row] of veMap) {
-            row.productCount = productSets.get(key)?.size ?? 0;
-        }
-
-        // Enrich S rows with product count from VE
-        for (const sRow of sRows) {
-            const matchingTxs = salesTransactions.filter(t =>
-                t.stationId === sRow.stationId &&
-                t.shiftDate === sRow.shiftDate &&
-                Number(t.productCode) > MAX_FUEL_CODE &&
-                (sRow.turno == null || t.turno === sRow.turno)
-            );
-            sRow.productCount = new Set(matchingTxs.map(t => t.productName)).size;
-            sRow.txCount = matchingTxs.length;
-        }
-
-        let results = [...sRows, ...Array.from(veMap.values())];
-
         if (search.trim()) {
             const q = search.toLowerCase();
             results = results.filter(d =>
@@ -209,16 +94,9 @@ const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, salesTrans
         }
 
         return results.sort((a, b) => b.shiftDate.localeCompare(a.shiftDate) || (a.turno ?? 0) - (b.turno ?? 0));
-    }, [dailyClosings, salesTransactions, selectedStationId, selectedTurno, dateFrom, dateTo, search, stationMap]);
+    }, [dailyClosings, selectedStationId, selectedTurno, dateFrom, dateTo, search, stationMap]);
 
     const totalShop = dayRows.reduce((sum, d) => sum + d.total, 0);
-
-    const getTransactionsForRow = (row: DayRow) =>
-        salesTransactions.filter(t =>
-            t.stationId === row.stationId &&
-            t.shiftDate === row.shiftDate &&
-            (row.turno == null || t.turno === row.turno)
-        );
 
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
@@ -275,7 +153,7 @@ const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, salesTrans
                                             </span>
                                         )}
                                         <span className="text-[10px] text-gray-300 dark:text-slate-600 ml-2">
-                                            {row.source === 'S' ? '(archivo S)' : '(datos VE)'}
+                                            (archivo S)
                                         </span>
                                     </div>
                                     <div className="text-right shrink-0 mr-2">
@@ -284,10 +162,7 @@ const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, salesTrans
                                     </div>
                                     {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
                                 </button>
-                                {isExpanded && (row.totalsSnapshot
-                                    ? <SnapshotBreakdown snapshot={row.totalsSnapshot} />
-                                    : <VeBreakdown transactions={getTransactionsForRow(row)} />
-                                )}
+                                {isExpanded && row.totalsSnapshot && <SnapshotBreakdown snapshot={row.totalsSnapshot} />}
                             </div>
                         );
                     })
