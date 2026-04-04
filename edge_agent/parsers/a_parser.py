@@ -13,6 +13,7 @@ Simple two-column format: LABEL (padded) + AMOUNT.
 """
 from __future__ import annotations
 
+import os
 import re
 import uuid
 
@@ -65,10 +66,16 @@ class AParser(BaseParser):
 
         shift_date = self._extract_shift_date_from_filename()
 
+        # Extract sequential turno from filename (A02040 → digits "02040" → turno after DDMM)
+        import re as _re
+        digits = _re.sub(r'^[A-Z]+', '', os.path.splitext(self.file_name)[0].upper())
+        turno = int(digits[4:]) if len(digits) > 4 else 0
+
         record = {
             "id":             str(uuid.uuid4()),
             "station_id":     self.station_id,
             "shift_date":     shift_date,
+            "turno":          turno,
             "caja_total":     str(totals.get("CAJA", 0)),
             "cheque_total":   str(totals.get("CHEQUE", 0)),
             "closing_ts":     self._get_file_mtime_ts(),
