@@ -73,14 +73,14 @@ const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, salesTra
             .filter(c => c.forecourtTotal != null)
             .filter(c => c.shiftDate >= dateFrom && c.shiftDate <= dateTo)
             .filter(c => !selectedStationId || c.stationId === selectedStationId)
-            .filter(c => !selectedTurno || !c.closingTs || getTurnoFromTs(c.closingTs) === selectedTurno)
+            .filter(c => !selectedTurno || !c.pClosingTs || getTurnoFromTs(c.pClosingTs) === selectedTurno)
             .map(c => ({
                 key: `P:${c.stationId}:${c.shiftDate}:${c.turno ?? 0}`,
                 stationId: c.stationId,
                 shiftDate: c.shiftDate,
                 turno: c.turno ?? undefined,
-                closingTs: c.closingTs,
-                totalsSnapshot: c.totalsSnapshot,
+                closingTs: c.pClosingTs,
+                totalsSnapshot: c.pTotalsSnapshot,
                 total: c.forecourtTotal!,
                 txCount: 0,
                 source: 'P' as const,

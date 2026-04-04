@@ -228,8 +228,12 @@ export const dbToDailyClosing = (row: DbDailyClosingRow): DailyClosing => ({
   stationId:            row.station_id,
   shiftDate:            row.shift_date,
   turno:                row.turno ?? undefined,
-  closingTs:            row.closing_ts ?? undefined,
+  closingTs:            row.closing_ts ?? row.p_closing_ts ?? row.s_closing_ts ?? undefined,
+  pClosingTs:           row.p_closing_ts ?? undefined,
+  sClosingTs:           row.s_closing_ts ?? undefined,
   totalsSnapshot:       row.totals_snapshot ?? undefined,
+  pTotalsSnapshot:      row.p_totals_snapshot ?? undefined,
+  sTotalsSnapshot:      row.s_totals_snapshot ?? undefined,
   forecourtTotal:       row.forecourt_total    != null ? Number(row.forecourt_total)    : undefined,
   shopTotal:            row.shop_total         != null ? Number(row.shop_total)         : undefined,
   transactionsTotal:    row.transactions_total != null ? Number(row.transactions_total) : undefined,
@@ -258,7 +262,11 @@ export const dailyClosingToDb = (dc: DailyClosing): Record<string, unknown> => {
   if (dc.reconciliationDiff !== undefined) payload.reconciliation_diff = dc.reconciliationDiff;
   if (dc.turno             !== undefined) payload.turno              = dc.turno;
   if (dc.closingTs         !== undefined) payload.closing_ts         = dc.closingTs;
+  if (dc.pClosingTs        !== undefined) payload.p_closing_ts       = dc.pClosingTs;
+  if (dc.sClosingTs        !== undefined) payload.s_closing_ts       = dc.sClosingTs;
   if (dc.totalsSnapshot    !== undefined) payload.totals_snapshot    = dc.totalsSnapshot;
+  if (dc.pTotalsSnapshot   !== undefined) payload.p_totals_snapshot  = dc.pTotalsSnapshot;
+  if (dc.sTotalsSnapshot   !== undefined) payload.s_totals_snapshot  = dc.sTotalsSnapshot;
   if (dc.pFileName         !== undefined) payload.p_file_name        = dc.pFileName;
   if (dc.sFileName         !== undefined) payload.s_file_name        = dc.sFileName;
   return payload;

@@ -110,12 +110,12 @@ class PParser(BaseParser):
             "station_id":        self.station_id,
             "shift_date":        shift_date,
             "forecourt_total":   str(forecourt_total) if forecourt_total is not None else None,
-            "closing_ts":        self._get_file_mtime_ts(),
+            "p_closing_ts":      self._get_file_mtime_ts(),
             "p_file_name":       self.file_name,
             "status":            "PENDING",
             # Full label dict stored for audit — reconciler will use forecourt_total
             "turno":             turno,
-            "totals_snapshot":   totals,
+            "p_totals_snapshot":  totals,
             "_playa":            playa,
         }
 
