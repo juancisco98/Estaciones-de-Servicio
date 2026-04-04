@@ -173,7 +173,8 @@ const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, salesTra
                                                 t.shiftDate === row.shiftDate &&
                                                 t.areaCode === 1 &&
                                                 Number(t.productCode) >= 1 &&
-                                                Number(t.productCode) <= 14
+                                                Number(t.productCode) <= 14 &&
+                                                (!row.closingTs || getTurnoFromTs(t.transactionTs) === getTurnoFromTs(row.closingTs))
                                             )}
                                         />
                                     </>
