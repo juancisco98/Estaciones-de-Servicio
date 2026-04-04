@@ -109,7 +109,7 @@ const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, salesTrans
             .filter(c => c.shopTotal != null)
             .filter(c => c.shiftDate >= dateFrom && c.shiftDate <= dateTo)
             .filter(c => !selectedStationId || c.stationId === selectedStationId)
-            .filter(c => !selectedTurno || (c.closingTs && getTurnoFromTs(c.closingTs) === selectedTurno))
+            .filter(c => !selectedTurno || !c.closingTs || getTurnoFromTs(c.closingTs) === selectedTurno)
             .map(c => ({
                 key: `S:${c.stationId}:${c.shiftDate}:${c.turno ?? 0}`,
                 stationId: c.stationId,

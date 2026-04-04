@@ -42,7 +42,7 @@ const CardPaymentsView: React.FC<CardPaymentsViewProps> = ({ stations, currentUs
         let list = cardPayments;
         if (selectedStationId) list = list.filter(p => p.stationId === selectedStationId);
         list = list.filter(p => p.shiftDate && p.shiftDate >= dateFrom && p.shiftDate <= dateTo);
-        if (selectedTurno) list = list.filter(p => p.paymentTs && getTurnoFromTs(p.paymentTs) === selectedTurno);
+        if (selectedTurno) list = list.filter(p => !p.paymentTs || getTurnoFromTs(p.paymentTs) === selectedTurno);
         if (filterType) list = list.filter(p => p.paymentType === filterType);
         if (search.trim()) {
             const q = search.toLowerCase();
