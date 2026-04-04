@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Fuel, Search, ChevronDown, ChevronUp } from 'lucide-react';
-import { Station, DailyClosing } from '../types';
+import { Station, DailyClosing, SalesTransaction } from '../types';
+import VeTransactionList from './VeTransactionList';
 import StationFilter from './StationFilter';
 import TurnoFilter, { Turno, getTurnoFromTs } from './TurnoFilter';
 import { getArgentinaToday } from '../utils/dateUtils';
@@ -8,6 +9,7 @@ import { getArgentinaToday } from '../utils/dateUtils';
 interface PlayaViewProps {
     stations: Station[];
     dailyClosings: DailyClosing[];
+    salesTransactions: SalesTransaction[];
     activeStationId?: string | null;
     onStationChange?: (id: string | null) => void;
 }
@@ -50,7 +52,7 @@ const SnapshotBreakdown: React.FC<{ snapshot: Record<string, number> }> = ({ sna
     );
 };
 
-const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, currentUser, activeStationId, onStationChange }) => {
+const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, salesTransactions, activeStationId, onStationChange }) => {
     const [search, setSearch] = useState('');
     const [dateFrom, setDateFrom] = useState(getArgentinaToday);
     const [dateTo, setDateTo] = useState(getArgentinaToday);
@@ -161,7 +163,21 @@ const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, currentU
                                     </div>
                                     {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
                                 </button>
-                                {isExpanded && row.totalsSnapshot && <SnapshotBreakdown snapshot={row.totalsSnapshot} />}
+                                {isExpanded && (
+                                    <>
+                                        {row.totalsSnapshot && <SnapshotBreakdown snapshot={row.totalsSnapshot} />}
+                                        <VeTransactionList
+                                            title="DETALLE VENTAS COMBUSTIBLE (VE)"
+                                            transactions={salesTransactions.filter(t =>
+                                                t.stationId === row.stationId &&
+                                                t.shiftDate === row.shiftDate &&
+                                                t.areaCode === 1 &&
+                                                Number(t.productCode) >= 1 &&
+                                                Number(t.productCode) <= 14
+                                            )}
+                                        />
+                                    </>
+                                )}
                             </div>
                         );
                     })

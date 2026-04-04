@@ -52,6 +52,7 @@ _TABLE_ROUTING: dict[str, tuple[str, str]] = {
     "T":  ("tank_levels",        "station_id,file_name,tank_id,recorded_at"),
     "P":  ("daily_closings",     "station_id,shift_date,turno"),
     "S":  ("daily_closings",     "station_id,shift_date,turno"),
+    "A":  ("cash_closings",     "station_id,shift_date,turno"),
 }
 
 

@@ -34,11 +34,12 @@ const AlertsView         = lazy(() => import('./components/AlertsView'));
 const PlayaView          = lazy(() => import('./components/PlayaView'));
 const ShopView           = lazy(() => import('./components/ShopView'));
 const CardPaymentsView   = lazy(() => import('./components/CardPaymentsView'));
+const CajaView           = lazy(() => import('./components/CajaView'));
 const AnalyticsDashboard = lazy(() => import('./components/AnalyticsDashboard'));
 const AdminSettings      = lazy(() => import('./components/AdminSettings'));
 const StationCard        = lazy(() => import('./components/StationCard'));
 
-const VALID_VIEWS: ViewState[] = ['MAP', 'STATIONS', 'SALES', 'TANKS', 'ALERTS', 'PLAYA', 'SHOP', 'ACCOUNTS', 'ANALYTICS', 'SETTINGS'];
+const VALID_VIEWS: ViewState[] = ['MAP', 'STATIONS', 'SALES', 'TANKS', 'ALERTS', 'PLAYA', 'SHOP', 'ACCOUNTS', 'CAJA', 'ANALYTICS', 'SETTINGS'];
 
 const LoadingFallback = () => (
   <div className="flex items-center justify-center h-full">
@@ -59,7 +60,7 @@ const Dashboard: React.FC = () => {
   const [activeStationId, setActiveStationId] = useState<string | null>(null);
   const [mapFlyTo, setMapFlyTo]               = useState<[number, number] | undefined>(undefined);
 
-  const { isLoading, refreshData, unresolvedAlertCount, criticalAlertCount } = useDataContext();
+  const { isLoading, refreshData, unresolvedAlertCount, criticalAlertCount, cashClosings } = useDataContext();
   const { stations, saveStation, deactivateStation, deleteStation } = useStations();
   const { employees } = useEmployees();
   const { salesTransactions }                           = useSalesTransactions();
@@ -427,6 +428,7 @@ const Dashboard: React.FC = () => {
               <PlayaView
                 stations={stations}
                 dailyClosings={dailyClosings}
+                salesTransactions={salesTransactions}
                 activeStationId={activeStationId}
                 onStationChange={setActiveStationId}
               />
@@ -439,6 +441,19 @@ const Dashboard: React.FC = () => {
               <ShopView
                 stations={stations}
                 dailyClosings={dailyClosings}
+                salesTransactions={salesTransactions}
+                activeStationId={activeStationId}
+                onStationChange={setActiveStationId}
+              />
+            </Suspense>
+          )}
+
+          {/* CAJA (Cash register from A*.TXT) */}
+          {currentView === 'CAJA' && (
+            <Suspense fallback={<LoadingFallback />}>
+              <CajaView
+                stations={stations}
+                cashClosings={cashClosings}
                 activeStationId={activeStationId}
                 onStationChange={setActiveStationId}
               />

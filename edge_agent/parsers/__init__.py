@@ -17,6 +17,7 @@ from .c_parser import CParser
 from .t_parser import TParser
 from .p_parser import PParser
 from .s_parser import SParser
+from .a_parser import AParser
 
 __all__ = [
     "BaseParser",
@@ -26,6 +27,7 @@ __all__ = [
     "TParser",
     "PParser",
     "SParser",
+    "AParser",
 ]
 
 # File prefix → parser class mapping (used by watcher.py router)
@@ -36,4 +38,5 @@ FILE_PREFIX_MAP: dict[str, type[BaseParser]] = {
     "T":  TParser,
     "P":  PParser,
     "S":  SParser,
+    "A":  AParser,
 }

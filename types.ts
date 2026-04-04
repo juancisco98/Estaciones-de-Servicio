@@ -141,6 +141,20 @@ export interface DailyClosing {
   updatedAt?: string;
 }
 
+// ── CASH CLOSINGS (A files) ──
+
+export interface CashClosing {
+  id: string;
+  stationId: string;
+  shiftDate: string;
+  turno?: number;
+  cajaTotal?: number;
+  chequeTotal?: number;
+  closingTs?: string;
+  aFileName?: string;
+  createdAt?: string;
+}
+
 // ── OWNER PREFERENCES ──
 
 export interface OwnerPreferences {

@@ -10,6 +10,7 @@ import {
     AlertLevel,
     AppNotification,
     AllowedEmail,
+    CashClosing,
 } from '../types';
 import {
     DbSalesTransactionRow,
@@ -31,6 +32,7 @@ import {
     dbToAlert,
     dbToNotification,
     dbToAllowedEmail,
+    dbToCashClosing,
 } from '../utils/mappers';
 import { handleError } from '../utils/errorHandler';
 import { TRANSACTIONS_LOAD_DAYS, RT_CHANNELS } from '../constants';
@@ -52,6 +54,8 @@ interface DataContextType {
     setDailyClosings: React.Dispatch<React.SetStateAction<DailyClosing[]>>;
     alerts: Alert[];
     setAlerts: React.Dispatch<React.SetStateAction<Alert[]>>;
+    cashClosings: CashClosing[];
+    setCashClosings: React.Dispatch<React.SetStateAction<CashClosing[]>>;
     allowedEmails: AllowedEmail[];
     setAllowedEmails: React.Dispatch<React.SetStateAction<AllowedEmail[]>>;
     notifications: AppNotification[];
@@ -74,6 +78,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [cardPayments, setCardPayments]           = useState<CardPayment[]>([]);
     const [tankLevels, setTankLevels]               = useState<TankLevel[]>([]);
     const [dailyClosings, setDailyClosings]         = useState<DailyClosing[]>([]);
+    const [cashClosings, setCashClosings]             = useState<CashClosing[]>([]);
     const [alerts, setAlerts]                       = useState<Alert[]>([]);
     const [notifications, setNotifications]         = useState<AppNotification[]>([]);
     const [allowedEmails, setAllowedEmails]         = useState<AllowedEmail[]>([]);
@@ -164,6 +169,16 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 if (cpResult.data) setCardPayments(cpResult.data.map(dbToCardPayment));
             } catch {
                 console.warn('[DataContext] card_payments table not available');
+            }
+
+            // cash_closings: A file data
+            try {
+                const ccResult = await supabase.from('cash_closings').select('*')
+                    .gte('shift_date', dateCutoffDate)
+                    .order('shift_date', { ascending: false });
+                if (ccResult.data) setCashClosings(ccResult.data.map(dbToCashClosing));
+            } catch {
+                console.warn('[DataContext] cash_closings table not available');
             }
 
             // allowed_emails: for superadmin owner management
@@ -326,6 +341,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             cardPayments,         setCardPayments,
             tankLevels,           setTankLevels,
             dailyClosings,        setDailyClosings,
+            cashClosings,         setCashClosings,
             alerts,               setAlerts,
             allowedEmails,        setAllowedEmails,
             notifications,

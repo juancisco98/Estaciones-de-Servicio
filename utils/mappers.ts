@@ -34,6 +34,7 @@ import {
   AccountType,
   AllowedEmail,
   OwnerPreferences,
+  CashClosing,
 } from '../types';
 
 import {
@@ -48,6 +49,7 @@ import {
   DbStationKnowledgeRow,
   DbAllowedEmailRow,
   DbOwnerPreferencesRow,
+  DbCashClosingRow,
 } from '../types/dbRows';
 
 // ─── STATION ─────────────────────────────────────────────────────────────────
@@ -261,6 +263,20 @@ export const dailyClosingToDb = (dc: DailyClosing): Record<string, unknown> => {
   if (dc.sFileName         !== undefined) payload.s_file_name        = dc.sFileName;
   return payload;
 };
+
+// ─── CASH CLOSING ─────────────────────────────────────────────────────────────
+
+export const dbToCashClosing = (row: DbCashClosingRow): CashClosing => ({
+  id:           row.id,
+  stationId:    row.station_id,
+  shiftDate:    row.shift_date,
+  turno:        row.turno ?? undefined,
+  cajaTotal:    row.caja_total != null ? Number(row.caja_total) : undefined,
+  chequeTotal:  row.cheque_total != null ? Number(row.cheque_total) : undefined,
+  closingTs:    row.closing_ts ?? undefined,
+  aFileName:    row.a_file_name ?? undefined,
+  createdAt:    row.created_at,
+});
 
 // ─── ALERT ────────────────────────────────────────────────────────────────────
 

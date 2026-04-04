@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { ShoppingBag, Search, ChevronDown, ChevronUp } from 'lucide-react';
-import { Station, DailyClosing } from '../types';
+import { Station, DailyClosing, SalesTransaction } from '../types';
+import VeTransactionList from './VeTransactionList';
 import StationFilter from './StationFilter';
 import TurnoFilter, { Turno, getTurnoFromTs } from './TurnoFilter';
 import { getArgentinaToday } from '../utils/dateUtils';
@@ -8,6 +9,7 @@ import { getArgentinaToday } from '../utils/dateUtils';
 interface ShopViewProps {
     stations: Station[];
     dailyClosings: DailyClosing[];
+    salesTransactions: SalesTransaction[];
     activeStationId?: string | null;
     onStationChange?: (id: string | null) => void;
 }
@@ -50,7 +52,7 @@ const SnapshotBreakdown: React.FC<{ snapshot: Record<string, number> }> = ({ sna
     );
 };
 
-const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, activeStationId, onStationChange }) => {
+const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, salesTransactions, activeStationId, onStationChange }) => {
     const [search, setSearch] = useState('');
     const [dateFrom, setDateFrom] = useState(getArgentinaToday);
     const [dateTo, setDateTo] = useState(getArgentinaToday);
@@ -162,7 +164,19 @@ const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, activeStat
                                     </div>
                                     {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
                                 </button>
-                                {isExpanded && row.totalsSnapshot && <SnapshotBreakdown snapshot={row.totalsSnapshot} />}
+                                {isExpanded && (
+                                    <>
+                                        {row.totalsSnapshot && <SnapshotBreakdown snapshot={row.totalsSnapshot} />}
+                                        <VeTransactionList
+                                            title="DETALLE VENTAS MINI MERCADO (VE)"
+                                            transactions={salesTransactions.filter(t =>
+                                                t.stationId === row.stationId &&
+                                                t.shiftDate === row.shiftDate &&
+                                                Number(t.productCode) > 14
+                                            )}
+                                        />
+                                    </>
+                                )}
                             </div>
                         );
                     })

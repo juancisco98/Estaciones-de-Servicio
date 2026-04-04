@@ -2,7 +2,7 @@ import React from 'react';
 import {
     Map as MapIcon, Fuel, ShoppingCart, Droplets,
     AlertTriangle, BarChart3, Settings, LogOut, X, ClipboardCheck,
-    Gauge, Sun, Moon, CreditCard, RefreshCw,
+    Gauge, Sun, Moon, CreditCard, RefreshCw, Banknote,
 } from 'lucide-react';
 import { User } from '../types';
 import { useTheme } from '../context/ThemeContext';
@@ -16,6 +16,7 @@ export type ViewState =
     | 'PLAYA'
     | 'SHOP'
     | 'ACCOUNTS'
+    | 'CAJA'
     | 'ANALYTICS'
     | 'SETTINGS';
 
@@ -73,6 +74,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         { id: 'PLAYA',           label: 'Playa',          icon: Fuel },
         { id: 'SHOP',            label: 'Mini Mercado',   icon: ClipboardCheck },
         { id: 'ACCOUNTS',       label: 'Cuentas Ctes.',  icon: CreditCard },
+        { id: 'CAJA',            label: 'Caja',           icon: Banknote },
         { id: 'ANALYTICS',      label: 'Analytics',      icon: BarChart3 },
         { id: 'SETTINGS',       label: 'Ajustes',        icon: Settings },
     ];

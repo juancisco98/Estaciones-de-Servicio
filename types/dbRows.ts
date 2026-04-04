@@ -112,6 +112,18 @@ export interface DbDailyClosingRow {
   updated_at?: string;
 }
 
+export interface DbCashClosingRow {
+  id: string;
+  station_id: string;
+  shift_date: string;
+  turno?: number | null;
+  caja_total?: number | string | null;
+  cheque_total?: number | string | null;
+  closing_ts?: string | null;
+  a_file_name?: string | null;
+  created_at?: string;
+}
+
 export interface DbAlertRow {
   id: string;
   station_id?: string | null;
