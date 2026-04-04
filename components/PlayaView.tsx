@@ -32,6 +32,7 @@ interface DayRow {
     stationId: string;
     shiftDate: string;
     turno?: number;
+    closingTs?: string;
     total: number;
     fuelLiters: number;
     txCount: number;
@@ -131,11 +132,13 @@ const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, salesTra
             .filter(c => c.forecourtTotal != null)
             .filter(c => c.shiftDate >= dateFrom && c.shiftDate <= dateTo)
             .filter(c => !selectedStationId || c.stationId === selectedStationId)
+            .filter(c => !selectedTurno || (c.closingTs && getTurnoFromTs(c.closingTs) === selectedTurno))
             .map(c => ({
                 key: `P:${c.stationId}:${c.shiftDate}:${c.turno ?? 0}`,
                 stationId: c.stationId,
                 shiftDate: c.shiftDate,
                 turno: c.turno ?? undefined,
+                closingTs: c.closingTs,
                 total: c.forecourtTotal!,
                 fuelLiters: 0,
                 txCount: 0,
@@ -261,9 +264,9 @@ const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, salesTra
                                             {stationMap.get(row.stationId) ?? row.stationId}
                                         </span>
                                         <span className="text-xs text-gray-400 dark:text-slate-500 font-mono ml-2">{row.shiftDate}</span>
-                                        {row.turno != null && (
+                                        {row.closingTs && (
                                             <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 ml-2">
-                                                T{row.turno}
+                                                {getTurnoFromTs(row.closingTs) === 'MANANA' ? 'Mañana' : getTurnoFromTs(row.closingTs) === 'TARDE' ? 'Tarde' : 'Noche'}
                                             </span>
                                         )}
                                         <span className="text-[10px] text-gray-300 dark:text-slate-600 ml-2">

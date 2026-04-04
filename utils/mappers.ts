@@ -226,6 +226,7 @@ export const dbToDailyClosing = (row: DbDailyClosingRow): DailyClosing => ({
   stationId:            row.station_id,
   shiftDate:            row.shift_date,
   turno:                row.turno ?? undefined,
+  closingTs:            row.closing_ts ?? undefined,
   forecourtTotal:       row.forecourt_total    != null ? Number(row.forecourt_total)    : undefined,
   shopTotal:            row.shop_total         != null ? Number(row.shop_total)         : undefined,
   transactionsTotal:    row.transactions_total != null ? Number(row.transactions_total) : undefined,
@@ -253,6 +254,7 @@ export const dailyClosingToDb = (dc: DailyClosing): Record<string, unknown> => {
   if (dc.transactionsTotal !== undefined) payload.transactions_total = dc.transactionsTotal;
   if (dc.reconciliationDiff !== undefined) payload.reconciliation_diff = dc.reconciliationDiff;
   if (dc.turno             !== undefined) payload.turno              = dc.turno;
+  if (dc.closingTs         !== undefined) payload.closing_ts         = dc.closingTs;
   if (dc.pFileName         !== undefined) payload.p_file_name        = dc.pFileName;
   if (dc.sFileName         !== undefined) payload.s_file_name        = dc.sFileName;
   return payload;

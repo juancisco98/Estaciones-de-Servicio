@@ -101,6 +101,7 @@ class SParser(BaseParser):
             "station_id":      self.station_id,
             "shift_date":      shift_date,
             "shop_total":      str(shop_total) if shop_total is not None else None,
+            "closing_ts":      self._get_file_mtime_ts(),
             "s_file_name":     self.file_name,
             "status":          "PENDING",
             "turno":           turno,

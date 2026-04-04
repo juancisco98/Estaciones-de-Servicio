@@ -144,7 +144,7 @@ class CParser(BaseParser):
                 "id":             str(uuid.uuid4()),
                 "station_id":     self.station_id,
                 "file_name":      self.file_name,
-                "payment_ts":     shift_date + "T00:00:00-03:00" if shift_date else None,
+                "payment_ts":     self._get_file_mtime_ts(),
                 "payment_type":   _map_payment_type(account_code),
                 "account_name":   account_name,
                 "amount":         str(amount),

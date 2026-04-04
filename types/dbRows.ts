@@ -97,6 +97,7 @@ export interface DbDailyClosingRow {
   station_id: string;
   shift_date: string;
   turno?: number | null;
+  closing_ts?: string | null;
   forecourt_total?: number | string | null;
   shop_total?: number | string | null;
   transactions_total?: number | string | null;

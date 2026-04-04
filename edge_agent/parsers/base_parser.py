@@ -224,6 +224,20 @@ class BaseParser(ABC):
                 pass
         return None
 
+    def _get_file_mtime_ts(self) -> str:
+        """
+        Return the file's modification time as ISO timestamp with Argentina tz.
+        Used by P/S/C parsers to determine real turno (Mañana/Tarde/Noche).
+        Example: P01041.TXT modified at 06:03 → "2026-04-01T06:03:00-03:00"
+        """
+        try:
+            mtime = os.path.getmtime(self.file_path)
+            dt = datetime.fromtimestamp(mtime)
+            return dt.strftime("%Y-%m-%dT%H:%M:%S") + "-03:00"
+        except OSError:
+            # Fallback: current time
+            return datetime.now().strftime("%Y-%m-%dT%H:%M:%S") + "-03:00"
+
     def _make_result(self) -> ParseResult:
         """Create an empty ParseResult for this parser."""
         return ParseResult(

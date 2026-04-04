@@ -4,6 +4,7 @@ import { Station, User, CardPayment } from '../types';
 import { PAYMENT_METHOD_LABELS } from '../constants';
 import { useCardPayments } from '../hooks/useCardPayments';
 import StationFilter from './StationFilter';
+import TurnoFilter, { Turno, getTurnoFromTs } from './TurnoFilter';
 import { getArgentinaToday } from '../utils/dateUtils';
 import { exportToCsv } from '../utils/exportCsv';
 
@@ -31,6 +32,7 @@ const CardPaymentsView: React.FC<CardPaymentsViewProps> = ({ stations, currentUs
     };
     const [dateFrom, setDateFrom] = useState(getArgentinaToday);
     const [dateTo, setDateTo]     = useState(getArgentinaToday);
+    const [selectedTurno, setSelectedTurno] = useState<Turno | null>(null);
     const [filterType, setFilterType] = useState<string>('');
     const [search, setSearch]     = useState('');
 
@@ -40,6 +42,7 @@ const CardPaymentsView: React.FC<CardPaymentsViewProps> = ({ stations, currentUs
         let list = cardPayments;
         if (selectedStationId) list = list.filter(p => p.stationId === selectedStationId);
         list = list.filter(p => p.shiftDate && p.shiftDate >= dateFrom && p.shiftDate <= dateTo);
+        if (selectedTurno) list = list.filter(p => p.paymentTs && getTurnoFromTs(p.paymentTs) === selectedTurno);
         if (filterType) list = list.filter(p => p.paymentType === filterType);
         if (search.trim()) {
             const q = search.toLowerCase();
@@ -50,7 +53,7 @@ const CardPaymentsView: React.FC<CardPaymentsViewProps> = ({ stations, currentUs
             );
         }
         return list.sort((a, b) => (b.paymentTs ?? '').localeCompare(a.paymentTs ?? ''));
-    }, [cardPayments, selectedStationId, dateFrom, dateTo, filterType, search, stationMap]);
+    }, [cardPayments, selectedStationId, selectedTurno, dateFrom, dateTo, filterType, search, stationMap]);
 
     const totalAmount = filtered.reduce((s, p) => s + p.amount, 0);
 
@@ -102,6 +105,7 @@ const CardPaymentsView: React.FC<CardPaymentsViewProps> = ({ stations, currentUs
                         onChange={handleStationChange}
                         className="min-w-[200px]"
                     />
+                    <TurnoFilter selected={selectedTurno} onChange={setSelectedTurno} />
 
                     <div className="flex items-center gap-1">
                         <input
