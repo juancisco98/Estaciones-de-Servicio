@@ -21,6 +21,7 @@ const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ stations, salesTran
     const [dateFrom, setDateFrom] = useState(getArgentinaToday);
     const [dateTo, setDateTo]     = useState(getArgentinaToday);
     const [selectedTurno, setSelectedTurno] = useState<Turno | null>(null);
+    const [selectedSector, setSelectedSector] = useState<string>('');
     const [search, setSearch]     = useState('');
 
     const stationMap = useMemo(() => new Map(stations.map(s => [s.id, s.name])), [stations]);
@@ -30,6 +31,8 @@ const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ stations, salesTran
         if (selectedStation) list = list.filter(t => t.stationId === selectedStation);
         list = list.filter(t => t.shiftDate >= dateFrom && t.shiftDate <= dateTo);
         if (selectedTurno) list = list.filter(t => getTurnoFromTs(t.transactionTs) === selectedTurno);
+        if (selectedSector === 'PLAYA') list = list.filter(t => t.areaCode === 1);
+        if (selectedSector === 'SHOP') list = list.filter(t => t.areaCode === 0);
         if (search.trim()) {
             const q = search.toLowerCase();
             list = list.filter(t =>
@@ -39,7 +42,7 @@ const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ stations, salesTran
             );
         }
         return list.sort((a, b) => b.transactionTs.localeCompare(a.transactionTs));
-    }, [salesTransactions, selectedStation, dateFrom, dateTo, selectedTurno, search]);
+    }, [salesTransactions, selectedStation, dateFrom, dateTo, selectedTurno, selectedSector, search]);
 
     const totalRevenue   = filtered.reduce((s, t) => s + t.totalAmount, 0);
     const totalFuelLiters = filtered.filter(t => Number(t.productCode) <= 20).reduce((s, t) => s + t.quantity, 0);
@@ -91,6 +94,16 @@ const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ stations, salesTran
                     )}
 
                     <TurnoFilter selected={selectedTurno} onChange={setSelectedTurno} />
+
+                    <select
+                        value={selectedSector}
+                        onChange={e => setSelectedSector(e.target.value)}
+                        className="text-sm rounded-xl bg-gray-100 dark:bg-slate-800 border border-transparent text-gray-800 dark:text-white px-4 py-2.5 min-h-[44px] focus:outline-none focus:border-amber-400"
+                    >
+                        <option value="">Todos los sectores</option>
+                        <option value="PLAYA">Playa</option>
+                        <option value="SHOP">Mini Mercado</option>
+                    </select>
 
                     <div className="flex items-center gap-1">
                         <input
