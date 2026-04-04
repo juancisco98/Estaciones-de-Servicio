@@ -9,12 +9,16 @@ export const TURNO_LABELS: Record<Turno, string> = {
 };
 
 /** Given an ISO timestamp, return which shift it belongs to.
- *  Extracts the hour directly from the ISO string (already Argentina time)
- *  instead of using Date.getHours() which converts to browser timezone. */
+ *  Always converts to Argentina timezone (America/Buenos_Aires)
+ *  because Supabase stores timestamps in UTC (+00). */
 export const getTurnoFromTs = (ts: string): Turno => {
-    // Extract hour from "...THH:MM..." — the timestamp is already in Argentina time (-03:00)
-    const match = ts.match(/T(\d{2}):/);
-    const hour = match ? parseInt(match[1], 10) : new Date(ts).getHours();
+    const hour = parseInt(
+        new Date(ts).toLocaleString('en-US', {
+            timeZone: 'America/Buenos_Aires',
+            hour: '2-digit',
+            hour12: false,
+        }), 10
+    );
     if (hour >= 6 && hour < 14) return 'MANANA';
     if (hour >= 14 && hour < 22) return 'TARDE';
     return 'NOCHE';
