@@ -33,13 +33,38 @@ interface DayRow {
     shiftDate: string;
     turno?: number;
     closingTs?: string;
+    totalsSnapshot?: Record<string, number>;
     total: number;
     fuelLiters: number;
     txCount: number;
     source: 'P' | 'VE';  // P file or derived from VE
 }
 
-const DayBreakdown: React.FC<{ transactions: SalesTransaction[] }> = ({ transactions }) => {
+// Labels to exclude from the P/S file breakdown (they are summary totals, not line items)
+const _SUMMARY_LABELS = new Set(['TOTAL SALE', 'TOTAL ENTRA', 'TOTAL COMBUSTIBLES']);
+
+const SnapshotBreakdown: React.FC<{ snapshot: Record<string, number> }> = ({ snapshot }) => {
+    const entries = Object.entries(snapshot)
+        .filter(([label]) => !_SUMMARY_LABELS.has(label))
+        .filter(([, amount]) => amount !== 0)
+        .sort(([, a], [, b]) => (b as number) - (a as number));
+
+    return (
+        <div className="border-t border-gray-100 dark:border-white/5 px-5 py-4 space-y-1">
+            {entries.map(([label, amount]) => (
+                <div key={label} className="flex items-center text-xs px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-slate-800/50">
+                    <span className="font-medium text-gray-700 dark:text-gray-300 flex-1">{label}</span>
+                    <span className="font-bold text-gray-900 dark:text-white w-28 text-right">{fmt(amount as number)}</span>
+                </div>
+            ))}
+            {entries.length === 0 && (
+                <p className="text-xs text-gray-400 dark:text-slate-500 text-center py-2">Sin detalle en archivo</p>
+            )}
+        </div>
+    );
+};
+
+const VeBreakdown: React.FC<{ transactions: SalesTransaction[] }> = ({ transactions }) => {
     const { combustibles, totalVarios } = useMemo(() => {
         const fuelMap = new Map<string, ProductGroup>();
         let varios = 0;
@@ -139,6 +164,7 @@ const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, salesTra
                 shiftDate: c.shiftDate,
                 turno: c.turno ?? undefined,
                 closingTs: c.closingTs,
+                totalsSnapshot: c.totalsSnapshot,
                 total: c.forecourtTotal!,
                 fuelLiters: 0,
                 txCount: 0,
@@ -279,7 +305,10 @@ const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, salesTra
                                     </div>
                                     {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
                                 </button>
-                                {isExpanded && <DayBreakdown transactions={getTransactionsForRow(row)} />}
+                                {isExpanded && (row.totalsSnapshot
+                                    ? <SnapshotBreakdown snapshot={row.totalsSnapshot} />
+                                    : <VeBreakdown transactions={getTransactionsForRow(row)} />
+                                )}
                             </div>
                         );
                     })

@@ -105,7 +105,7 @@ class SParser(BaseParser):
             "s_file_name":     self.file_name,
             "status":          "PENDING",
             "turno":           turno,
-            "_totals_snapshot": totals,
+            "totals_snapshot":  totals,
             "_salon":          salon,
         }
 

@@ -98,6 +98,7 @@ export interface DbDailyClosingRow {
   shift_date: string;
   turno?: number | null;
   closing_ts?: string | null;
+  totals_snapshot?: Record<string, number> | null;
   forecourt_total?: number | string | null;
   shop_total?: number | string | null;
   transactions_total?: number | string | null;

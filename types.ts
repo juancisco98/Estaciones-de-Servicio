@@ -127,6 +127,7 @@ export interface DailyClosing {
   shiftDate: string;          // YYYY-MM-DD
   turno?: number;             // shift number from P/S file
   closingTs?: string;         // file mtime ISO — determines real turno (Mañana/Tarde/Noche)
+  totalsSnapshot?: Record<string, number>; // all labels from P/S file (VENTAS DE COMBUSTIBLES, etc.)
   forecourtTotal?: number;    // TOTAL SALE from P*.TXT
   shopTotal?: number;         // TOTAL SALE from S*.TXT
   transactionsTotal?: number; // SUM(sales_transactions.total_amount)
