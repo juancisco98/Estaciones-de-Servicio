@@ -48,7 +48,7 @@ _T_LINE_RE = re.compile(
     r'STOCK:\s*([\d.,]+)\s+'            # [7] current stock liters ← KEY
     r'TURNO\s+(\d+)\s+'                 # [8] turno
     r'PLAYA\s+(\d+)\s+'                 # [9] playa
-    r'NRO\.BOCA\s+(\d+)\s*$'           # [10] nozzle number
+    r'(?:NRO\.BOCA|NR\.BCA)\s+%?(\d+)\s*$'  # [10] nozzle/boca (Matheu: NRO.BOCA 520, Campana: NR.BCA %151847)
 )
 
 
@@ -113,6 +113,7 @@ class TParser(BaseParser):
                 "id":                  str(uuid.uuid4()),
                 "station_id":          self.station_id,
                 "file_name":           self.file_name,
+                "shift_date":          self._extract_shift_date_from_filename(),
                 "recorded_at":         recorded_at,
                 "tank_id":             tank_id,
                 "product_name":        product_name.strip(),
