@@ -59,9 +59,10 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     const stationMetrics = useMemo(() =>
         stations
             .filter(s => s.isActive)
+            .filter(s => !selectedStationId || s.id === selectedStationId)
             .map(s => ({ ...getStationMetrics(s.id, dateFrom, dateTo), stationName: s.name }))
             .sort((a, b) => b.totalRevenue - a.totalRevenue),
-    [stations, getStationMetrics, dateFrom, dateTo]);
+    [stations, getStationMetrics, dateFrom, dateTo, selectedStationId]);
 
     // Time series for selected station or first with data
     const chartStationId = selectedStationId || (stationMetrics.find(m => m.totalTransactions > 0)?.stationId ?? '');
@@ -90,6 +91,9 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         : 'Período personalizado';
 
     const activeStations = stations.filter(s => s.isActive);
+    const selectedStationName = selectedStationId
+        ? stations.find(s => s.id === selectedStationId)?.name ?? ''
+        : `Red completa (${activeStations.length} estaciones)`;
 
     return (
         <div className="flex flex-col h-full bg-gray-50 dark:bg-slate-950 overflow-y-auto">
@@ -127,6 +131,16 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                                 className="flex-1 px-4 py-2.5 min-h-[44px] rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-slate-800 text-sm text-gray-900 dark:text-white focus:outline-none" />
                         </div>
                     )}
+                    <select
+                        value={selectedStationId}
+                        onChange={e => setSelectedStationId(e.target.value)}
+                        className="text-sm rounded-xl bg-gray-100 dark:bg-slate-800 border border-transparent text-gray-800 dark:text-white px-4 py-2.5 min-h-[44px] focus:outline-none focus:border-amber-400 mt-2"
+                    >
+                        <option value="">Todas las estaciones</option>
+                        {stations.filter(s => s.isActive).map(s => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                    </select>
                 </div>
             </div>
 
@@ -134,7 +148,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                 {/* Network KPIs */}
                 <div>
                     <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-3">
-                        {periodLabel} — Red completa ({activeStations.length} estaciones)
+                        {periodLabel} — {selectedStationName}
                     </p>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         {[
