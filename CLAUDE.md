@@ -85,11 +85,11 @@ C:\SVAPP\*.TXT                  ← legacy VB system writes files here
         ↓ (watchdog FileSystemEventHandler + debounce 2s)
 edge_agent/watcher.py           ← detects new/modified .TXT files
         ↓ (MD5 idempotency check via state.json)
-edge_agent/parsers/             ← VEParser, CParser, TParser, PParser, SParser
+edge_agent/parsers/             ← VEParser, CParser, TParser, PParser, SParser, AParser
         ↓ (ParseResult: records + errors + raw_file)
 edge_agent/uploader.py          ← POST to Supabase REST (service_role key)
         ↓
-Supabase PostgreSQL             ← sales_transactions, tank_levels, card_payments, daily_closings
+Supabase PostgreSQL             ← sales_transactions, tank_levels, card_payments, daily_closings, cash_closings
         ↓
 Supabase Realtime               ← postgres_changes channel → React frontend
         ↓
@@ -121,9 +121,10 @@ React (App.tsx)                 ← polls hasta completed → toast + refreshDat
 | `edge_agent/parsers/p_parser.py` | Parser P*.TXT — totales playa (forecourt) con turno |
 | `edge_agent/parsers/s_parser.py` | Parser S*.TXT — totales salon (shop) con turno |
 | `edge_agent/parsers/t_parser.py` | Parser T*.TXT — tanques dinámicos TQ1-TQ99, año 2/4 dígitos |
-| `edge_agent/parsers/c_parser.py` | Parser C*.TXT — cuentas corrientes y tarjetas |
+| `edge_agent/parsers/c_parser.py` | Parser C*.TXT — cuentas corrientes y tarjetas, detecta líneas corruptas VB |
+| `edge_agent/parsers/a_parser.py` | Parser A*.TXT — caja (efectivo + cheques) por turno |
 | `edge_agent/config.yaml` | supabase_url, watch_path, station_id, max_file_size |
-| `edge_agent/setup.ps1` | Instalador automático (3 preguntas, no duplica estaciones) |
+| `edge_agent/setup.ps1` | Instalador automático: para servicio → copia → limpia cache → configura → arranca |
 | `context/DataContext.tsx` | Estado global React + real-time subscriptions |
 | `utils/mappers.ts` | DB snake_case ↔ App camelCase — incluye turno/area_code |
 | `utils/dateUtils.ts` | `getArgentinaToday()` — SIEMPRE usar para fechas en frontend |
@@ -131,8 +132,10 @@ React (App.tsx)                 ← polls hasta completed → toast + refreshDat
 | `types.ts` | Interfaces TypeScript + TankId dinámico + turno/areaCode |
 | `types/dbRows.ts` | Mirror de columnas SQL para mappers |
 | `components/TurnoFilter.tsx` | Filtro Mañana(6-14)/Tarde(14-22)/Noche(22-6) + `getTurnoFromTs()` |
-| `components/PlayaView.tsx` | Datos P files + fallback VE, filtro turno |
-| `components/ShopView.tsx` | Datos S files + fallback VE, filtro turno |
+| `components/PlayaView.tsx` | Datos P files EXCLUSIVAMENTE (SnapshotBreakdown), filtro turno |
+| `components/ShopView.tsx` | Datos S files EXCLUSIVAMENTE (SnapshotBreakdown), filtro turno |
+| `components/CajaView.tsx` | Datos A files — efectivo + cheques por turno |
+| `components/Header.tsx` | Indicador de salud por estación (ONLINE/LENTO/OFFLINE) |
 | `constants.ts` | MAP_CENTER, PRODUCT_CODES, ALERT_LEVELS, PAYMENT_METHODS |
 
 ---
@@ -148,7 +151,8 @@ React (App.tsx)                 ← polls hasta completed → toast + refreshDat
 | `sales_transactions` | Cada línea de VE*.TXT — incluye `turno` y `area_code` (1=playa, 0=salon) |
 | `card_payments` | Cada línea de C*.TXT procesada |
 | `tank_levels` | Niveles TQ1-TQ99 de T*.TXT (dinámico, CHECK regex) |
-| `daily_closings` | Totales P+S por turno. UNIQUE: `(station_id, shift_date, turno)` |
+| `daily_closings` | Totales P+S por turno. Columnas separadas P/S: `p_closing_ts`, `s_closing_ts`, `p_totals_snapshot`, `s_totals_snapshot`. UNIQUE: `(station_id, shift_date, turno)` |
+| `cash_closings` | Totales A (efectivo + cheques) por turno. UNIQUE: `(station_id, shift_date, turno)` |
 | `scan_requests` | Pedidos de refresh desde dashboard. Edge agent polls cada 15s |
 | `alerts` | Alertas CRITICAL/WARNING/INFO generadas |
 | `station_knowledge` | JSONB de aprendizaje por estación |
@@ -165,7 +169,8 @@ React (App.tsx)                 ← polls hasta completed → toast + refreshDat
 ### IDs — CRÍTICO
 - **NUNCA** usar `Date.now()`, `Math.random()` como ID primario en Supabase.
 - **SIEMPRE** usar `generateUUID()` en TypeScript (función manual UUID v4).
-- En Python: `import uuid; str(uuid.uuid4())` — seguro en todos los entornos.
+- En Python para VE/C/T: `import uuid; str(uuid.uuid4())` — seguro en todos los entornos.
+- **P/S/A parsers NO envían `id`** — PostgreSQL genera UUID vía `DEFAULT gen_random_uuid()`. Esto evita que el upsert de S sobreescriba el `id` que puso P en la misma fila.
 
 ### Non-Destructive File Handling — REGLA DE ORO
 - El edge agent **NUNCA** escribe ni modifica archivos en `D:\SVAPP`.
@@ -245,6 +250,35 @@ className="... overflow-y-auto"               // body
 - Para **auth** y flujos de ingesta: usar `console.log/error/warn` directo, NO `logger`.
 - `logger` solo imprime cuando `import.meta.env.DEV === true`.
 
+### `_extract_shift_date_from_filename()` — NUNCA retorna None
+- Cadena de fallback: YYYYMMDD → DDMMYYYY → DDMM+turno (año del mtime) → mtime del archivo → `date.today()`.
+- Garantiza que `shift_date` SIEMPRE tiene un valor válido. Ningún archivo se descarta por falta de fecha.
+
+### Uploader — Reintentos y resiliencia
+- **HTTP 5xx:** se reintenta con backoff exponencial (máx 3 intentos). Supabase caído no pierde datos.
+- **HTTP 4xx:** se loguea con detalle completo del error de PostgREST para diagnóstico.
+- **Dead letter:** un solo archivo `.json` por archivo fallido (sobrescribe, no acumula). Incluye `last_error` con el mensaje de Supabase.
+- **Archivos fallidos NUNCA se descartan.** Se reintentan en cada escaneo programado (06:15, 14:15, 22:15) hasta que funcionen.
+
+### setup.ps1 — Flujo de instalación/reinstalación
+1. Para servicio existente (`sc.exe stop StationOSEdgeAgent`)
+2. Copia archivos Python al `C:\StationOS`
+3. **Limpia `state.json` y `__pycache__`** (fuerza reprocesamiento completo)
+4. Genera `config.yaml` y `.env`
+5. Instala dependencias Python
+6. Registra e inicia servicio Windows
+7. Configura tarea programada de respaldo (06:15, 14:15, 22:15)
+
+### PlayaView/ShopView — Solo datos P/S
+- Playa muestra EXCLUSIVAMENTE el desglose del archivo P (`SnapshotBreakdown`): VENTAS DE COMBUSTIBLES, TIRADAS EFECTIVO, etc.
+- Mini Mercado muestra EXCLUSIVAMENTE el desglose del archivo S.
+- **NO muestran transacciones VE individuales.** Los productos VE solo se ven en Historial de Ventas.
+
+### Indicador de salud de estación — Header
+- Calcula la última sincronización por estación usando `max(transactionTs, pClosingTs, sClosingTs, createdAt)`.
+- Verde (ONLINE): < 12 horas. Ámbar (LENTO): 12-24 horas. Rojo (OFFLINE): > 24 horas o sin datos.
+- Click en el icono Activity muestra dropdown con estado por estación.
+
 ---
 
 ## 12. Self-Improvement Loop
@@ -286,9 +320,10 @@ Cada vez que se detecte un error de parsing o reconciliación que se repita 3+ v
 - `MAX_ALERTS_PER_BATCH = 5` evita que un archivo VE corrupto con 500 líneas negativas genere 500 alertas CRITICAL en segundos, colapsando la UI. Las primeras 5 son suficientes para notificar al operador.
 - La idempotencia de alertas (`_insert_alert_idempotent`) verifica por `(station_id, type, related_date, resolved=false)`. Si se re-procesa el mismo archivo, no duplica alertas.
 
-#### T Parser — Formato de fecha variable
-- Los archivos T pueden tener fecha `DD-MM-YY` (2 dígitos de año) o `DD-MM-YYYY` (4 dígitos). El regex usa `\d{2,4}` y `_parse_t_date()` detecta automáticamente con `len(year_part)`.
-- Sin esto, `03-04-2026` se parseaba como `03-04-20` (año 2020) descartando `26`.
+#### T Parser — Formato de fecha variable y corrección de año
+- Los archivos T pueden tener fecha `DD-MM-YY` (2 dígitos de año) o `DD-MM-YYYY` (4 dígitos). El regex usa `\d{2,4}`.
+- **Bug resuelto:** Python `%y` interpreta "20" como año 2020, no 2026. Fix: `_parse_t_date()` usa el año del `mtime` del archivo (más confiable que `%y`) cuando el año tiene 2 dígitos. Si `mtime` no está disponible, usa `datetime.now().year`.
+- El `recorded_at` ahora siempre tiene el año correcto.
 
 #### P/S Parser — Formato NR.BCA variable
 - Matheu: `NR.BCA 520` (sin %). Campana: `NR.BCA %151847` (con %). El regex original no matcheaba el `%` y descartaba TODOS los archivos P/S de Campana silenciosamente.
@@ -298,9 +333,11 @@ Cada vez que se detecte un error de parsing o reconciliación que se repita 3+ v
 - Los archivos VB escriben hora local Argentina. Si el parser guarda sin timezone, Supabase interpreta como UTC y el browser resta 3 horas (06:01 → 03:01).
 - Fix: todos los parsers (VE, T, C) agregan `-03:00` al ISO timestamp.
 
-#### PlayaView/ShopView — Independencia de daily_closings
-- Las vistas Playa y Shop NO deben depender exclusivamente de archivos P/S. Si la estación no tiene P/S procesados, deben funcionar con datos de VE como fallback.
-- Fuente primaria: daily_closings (archivos P/S). Fallback: sales_transactions (archivos VE) agrupados por día.
+#### PlayaView/ShopView — Solo archivos P/S, sin VE
+- Las vistas Playa y Shop muestran EXCLUSIVAMENTE el desglose del archivo P/S (`SnapshotBreakdown`).
+- NO muestran transacciones VE individuales. Los productos VE solo se ven en Historial de Ventas.
+- Si no hay archivos P/S procesados para la fecha, la vista muestra "Sin datos" — NO hace fallback a VE.
+- Esto fue decisión explícita del dueño: cada archivo va a su sección correspondiente, sin mezclar.
 
 #### setup.ps1 — No duplicar estaciones
 - Antes de crear una estación nueva, buscar si ya existe con `GET stations?owner_email=eq.X&name=eq.Y`. Si existe, reutilizar el UUID. Esto permite reinstalar el edge agent sin crear estaciones duplicadas.
@@ -308,6 +345,33 @@ Cada vez que se detecte un error de parsing o reconciliación que se repita 3+ v
 #### Array.from(Map.values()) — Pierde tipos en TypeScript
 - `Array.from(map.values())` devuelve `unknown[]` en lugar del tipo genérico del Map.
 - Usar `[...map.values()]` que preserva el tipo correctamente.
+
+#### P/S/A Parsers — No enviar `id` en upsert
+- PostgREST con `resolution=merge-duplicates` actualiza TODOS los campos del payload, incluido `id`. Si P envía `id=uuid-1` y luego S envía `id=uuid-2`, el `id` primario de la fila cambia. Esto rompe cualquier referencia FK futura.
+- Fix: P, S y A parsers NO envían `id`. PostgreSQL genera UUID vía `DEFAULT gen_random_uuid()` al INSERT. En UPDATE (upsert conflict), `id` no se toca.
+- VE, C y T parsers SÍ envían `id` porque cada registro es una fila nueva (no upsert de merge).
+
+#### C Parser — Líneas corruptas VB
+- El sistema VB puede generar montos corruptos como `% 95179928312.37D+%5` (línea 3 MASTERCARD).
+- El regex `_C_LINE_RE` no matchea estas líneas → se saltean.
+- Ahora se loguean como WARNING (`result.add_error`) para audit trail, en vez de silencio.
+- Las líneas válidas del mismo archivo se procesan normalmente — una línea corrupta NO invalida el archivo.
+
+#### Watcher — Archivos fallidos nunca se descartan
+- Si un archivo falla el upload, se marca como `failed` en `state.json` (con `fail_count` y `last_error`).
+- Se reintenta en cada escaneo programado (06:15, 14:15, 22:15) INDEFINIDAMENTE hasta que funcione.
+- Si el contenido del archivo cambia (nuevo MD5), el contador de fallos se resetea.
+- Dead letter: un solo archivo `.json` por archivo fuente (sobrescribe, no acumula).
+
+#### Uploader — Retry en HTTP 5xx
+- Supabase puede devolver 500/502/503 durante mantenimiento o sobrecarga.
+- El uploader ahora re-lanza `httpx.NetworkError` para errores 5xx → tenacity los reintenta con backoff exponencial (3 intentos, máx 60s).
+- Errores 4xx NO se reintentan (son errores de datos/schema, no transitorios).
+
+#### DataContext — Subscripciones Real-time completas
+- `tank_levels` ahora escucha `event: '*'` (INSERT + UPDATE), no solo INSERT.
+- Cuando un T file se reprocesa (upsert → UPDATE en WAL), el frontend se actualiza sin refresh manual.
+- `daily_closings` ya escuchaba `event: '*'` — correcto para P→S merge.
 
 ---
 

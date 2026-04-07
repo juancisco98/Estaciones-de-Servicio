@@ -16,6 +16,8 @@ import {
     DbSalesTransactionRow,
     DbTankLevelRow,
     DbDailyClosingRow,
+    DbCardPaymentRow,
+    DbCashClosingRow,
     DbAlertRow,
     DbNotificationRow,
     DbAllowedEmailRow,
@@ -140,6 +142,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     .gte('shift_date', dateCutoffDate)
                     .order('shift_date', { ascending: false }),
                 supabase.from('tank_levels').select('*')
+                    .gte('recorded_at', dateCutoffDate)
                     .order('recorded_at', { ascending: false })
                     .limit(1000),
                 supabase.from('alerts').select('*')
@@ -152,6 +155,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
             if (stationsResult.error)  throw stationsResult.error;
             if (employeesResult.error) throw employeesResult.error;
+
+            // Log errors but don't crash on non-critical tables
+            if (txResult.error)            console.error('[DataContext] sales_transactions error:', txResult.error);
+            if (closingsResult.error)      console.error('[DataContext] daily_closings error:', closingsResult.error);
+            if (tanksResult.error)         console.error('[DataContext] tank_levels error:', tanksResult.error);
+            if (alertsResult.error)        console.error('[DataContext] alerts error:', alertsResult.error);
+            if (notificationsResult.error) console.error('[DataContext] notifications error:', notificationsResult.error);
 
             if (stationsResult.data)      setStations(stationsResult.data.map(dbToStation));
             if (employeesResult.data)     setEmployees(employeesResult.data.map(dbToEmployee));
@@ -227,12 +237,18 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const tanksChannel = supabase
             .channel(RT_CHANNELS.TANKS)
             .on('postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'tank_levels' },
+                { event: '*', schema: 'public', table: 'tank_levels' },
                 (payload) => {
-                    setTankLevels(prev => {
-                        if (prev.some(t => t.id === payload.new.id)) return prev;
-                        return [dbToTankLevel(payload.new as DbTankLevelRow), ...prev];
-                    });
+                    if (payload.eventType === 'INSERT') {
+                        setTankLevels(prev => {
+                            if (prev.some(t => t.id === payload.new.id)) return prev;
+                            return [dbToTankLevel(payload.new as DbTankLevelRow), ...prev];
+                        });
+                    } else if (payload.eventType === 'UPDATE') {
+                        setTankLevels(prev => prev.map(t =>
+                            t.id === payload.new.id ? dbToTankLevel(payload.new as DbTankLevelRow) : t
+                        ));
+                    }
                 }
             ).subscribe();
 
@@ -324,10 +340,54 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 }
             ).subscribe();
 
+        // Card payments (C files)
+        const cardPaymentsChannel = supabase
+            .channel(RT_CHANNELS.CARD_PAYMENTS)
+            .on('postgres_changes',
+                { event: '*', schema: 'public', table: 'card_payments' },
+                (payload) => {
+                    if (payload.eventType === 'INSERT') {
+                        setCardPayments(prev => {
+                            if (prev.some(p => p.id === payload.new.id)) return prev;
+                            return [dbToCardPayment(payload.new as DbCardPaymentRow), ...prev];
+                        });
+                    } else if (payload.eventType === 'UPDATE') {
+                        setCardPayments(prev => prev.map(p =>
+                            p.id === payload.new.id ? dbToCardPayment(payload.new as DbCardPaymentRow) : p
+                        ));
+                    } else if (payload.eventType === 'DELETE') {
+                        setCardPayments(prev => prev.filter(p => p.id !== payload.old.id));
+                    }
+                }
+            ).subscribe();
+
+        // Cash closings (A files)
+        const cashClosingsChannel = supabase
+            .channel(RT_CHANNELS.CASH_CLOSINGS)
+            .on('postgres_changes',
+                { event: '*', schema: 'public', table: 'cash_closings' },
+                (payload) => {
+                    if (payload.eventType === 'INSERT') {
+                        setCashClosings(prev => {
+                            if (prev.some(c => c.id === payload.new.id)) return prev;
+                            return [dbToCashClosing(payload.new as DbCashClosingRow), ...prev];
+                        });
+                    } else if (payload.eventType === 'UPDATE') {
+                        setCashClosings(prev => prev.map(c =>
+                            c.id === payload.new.id ? dbToCashClosing(payload.new as DbCashClosingRow) : c
+                        ));
+                    } else if (payload.eventType === 'DELETE') {
+                        setCashClosings(prev => prev.filter(c => c.id !== payload.old.id));
+                    }
+                }
+            ).subscribe();
+
         return () => {
             supabase.removeChannel(salesChannel);
             supabase.removeChannel(tanksChannel);
             supabase.removeChannel(closingsChannel);
+            supabase.removeChannel(cardPaymentsChannel);
+            supabase.removeChannel(cashClosingsChannel);
             supabase.removeChannel(alertsChannel);
             supabase.removeChannel(notificationsChannel);
         };

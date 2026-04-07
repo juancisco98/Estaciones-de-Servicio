@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Menu, Loader2, Bell, Sun, Moon, X, Check, LogOut, RefreshCw, Search, AlertTriangle, Fuel } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Menu, Loader2, Bell, Sun, Moon, X, Check, LogOut, RefreshCw, Search, AlertTriangle, Fuel, Activity } from 'lucide-react';
 import { User, AppNotification } from '../types';
 import InstallButton from './InstallButton';
 import { useTheme } from '../context/ThemeContext';
@@ -88,7 +88,7 @@ const Header: React.FC<HeaderProps> = ({
     unresolvedAlertCount = 0,
     criticalAlertCount = 0,
 }) => {
-    const { notifications, unreadCount, markNotificationRead, markAllNotificationsRead } = useDataContext();
+    const { notifications, unreadCount, markNotificationRead, markAllNotificationsRead, salesTransactions, dailyClosings, stations } = useDataContext();
     const [showNotifications, setShowNotifications] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
@@ -121,6 +121,64 @@ const Header: React.FC<HeaderProps> = ({
     };
 
     const totalBadge = unreadCount + unresolvedAlertCount;
+
+    // Station health: compute last sync time per station
+    const stationHealth = useMemo(() => {
+        const now = Date.now();
+        const healthMap = new Map<string, { name: string; lastSync: number; ago: string; status: 'OK' | 'WARNING' | 'CRITICAL' }>();
+
+        for (const st of stations) {
+            // Find most recent data for this station across all tables
+            let latest = 0;
+
+            for (const tx of salesTransactions) {
+                if (tx.stationId === st.id && tx.transactionTs) {
+                    const t = new Date(tx.transactionTs).getTime();
+                    if (t > latest) latest = t;
+                }
+            }
+            for (const dc of dailyClosings) {
+                if (dc.stationId === st.id) {
+                    const ts = dc.pClosingTs || dc.sClosingTs || dc.createdAt;
+                    if (ts) {
+                        const t = new Date(ts).getTime();
+                        if (t > latest) latest = t;
+                    }
+                }
+            }
+
+            if (latest === 0) {
+                healthMap.set(st.id, { name: st.name, lastSync: 0, ago: 'Sin datos', status: 'CRITICAL' });
+                continue;
+            }
+
+            const diffHours = (now - latest) / 3600000;
+            const status = diffHours < 12 ? 'OK' : diffHours < 24 ? 'WARNING' : 'CRITICAL';
+            healthMap.set(st.id, { name: st.name, lastSync: latest, ago: timeAgo(new Date(latest).toISOString()), status });
+        }
+
+        return healthMap;
+    }, [stations, salesTransactions, dailyClosings]);
+
+    // Overall status: worst station determines the indicator
+    const overallStatus = useMemo(() => {
+        if (stationHealth.size === 0) return 'OK' as const;
+        const statuses = [...stationHealth.values()].map(h => h.status);
+        if (statuses.includes('CRITICAL')) return 'CRITICAL' as const;
+        if (statuses.includes('WARNING')) return 'WARNING' as const;
+        return 'OK' as const;
+    }, [stationHealth]);
+
+    const [showHealth, setShowHealth] = useState(false);
+    const healthRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (healthRef.current && !healthRef.current.contains(e.target as Node)) setShowHealth(false);
+        };
+        if (showHealth) document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [showHealth]);
 
     return (
         <div className="absolute top-0 left-0 right-0 z-[800] p-4 sm:p-5 pointer-events-none">
@@ -203,6 +261,64 @@ const Header: React.FC<HeaderProps> = ({
                     >
                         {isLoading ? <Loader2 className="w-[18px] h-[18px] animate-spin text-amber-500" /> : <RefreshCw className="w-[18px] h-[18px]" />}
                     </button>
+
+                    {/* Station health indicator */}
+                    <div className="relative" ref={healthRef}>
+                        <button
+                            onClick={() => setShowHealth(v => !v)}
+                            className={`p-2 rounded-xl transition-all active:scale-95 w-10 h-10 flex items-center justify-center relative
+                                ${overallStatus === 'OK' ? 'hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-emerald-500' :
+                                  overallStatus === 'WARNING' ? 'hover:bg-amber-50 dark:hover:bg-amber-900/20 text-amber-500' :
+                                  'hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500'}`}
+                            aria-label="Estado de estaciones"
+                        >
+                            <Activity className="w-[18px] h-[18px]" />
+                            <span className={`absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-slate-900
+                                ${overallStatus === 'OK' ? 'bg-emerald-400' : overallStatus === 'WARNING' ? 'bg-amber-400 animate-pulse' : 'bg-red-500 animate-pulse'}`} />
+                        </button>
+
+                        {showHealth && (
+                            <div className="absolute right-0 top-[46px] w-80 z-[900]
+                                            bg-white/90 dark:bg-slate-900/95
+                                            backdrop-blur-2xl
+                                            border border-white/60 dark:border-white/10
+                                            rounded-2xl overflow-hidden animate-scale-in"
+                                style={{ boxShadow: '0 20px 48px rgba(0,0,0,0.14), 0 4px 12px rgba(0,0,0,0.08)' }}
+                            >
+                                <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100/80 dark:border-white/8">
+                                    <Activity className="w-4 h-4 text-slate-500" />
+                                    <span className="font-bold text-sm text-slate-800 dark:text-white">Estado de Estaciones</span>
+                                </div>
+                                <div className="max-h-[300px] overflow-y-auto">
+                                    {stationHealth.size === 0 ? (
+                                        <div className="py-8 text-center text-slate-400 text-sm">Sin estaciones</div>
+                                    ) : (
+                                        [...stationHealth.values()].map(h => (
+                                            <div key={h.name} className="flex items-center gap-3 px-4 py-3 border-b border-gray-50/80 dark:border-white/5 last:border-0">
+                                                <span className={`w-2.5 h-2.5 rounded-full shrink-0
+                                                    ${h.status === 'OK' ? 'bg-emerald-400' : h.status === 'WARNING' ? 'bg-amber-400' : 'bg-red-500'}`} />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-semibold text-slate-800 dark:text-white truncate">{h.name}</p>
+                                                    <p className={`text-xs font-medium
+                                                        ${h.status === 'OK' ? 'text-emerald-600 dark:text-emerald-400' :
+                                                          h.status === 'WARNING' ? 'text-amber-600 dark:text-amber-400' :
+                                                          'text-red-600 dark:text-red-400'}`}>
+                                                        {h.lastSync === 0 ? 'Sin datos recibidos' : `Última sync: ${h.ago}`}
+                                                    </p>
+                                                </div>
+                                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full
+                                                    ${h.status === 'OK' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400' :
+                                                      h.status === 'WARNING' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' :
+                                                      'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'}`}>
+                                                    {h.status === 'OK' ? 'ONLINE' : h.status === 'WARNING' ? 'LENTO' : 'OFFLINE'}
+                                                </span>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
 
                     {/* Theme toggle pill */}
                     <ThemeToggle />

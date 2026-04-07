@@ -184,15 +184,15 @@ class BaseParser(ABC):
         ts = self._parse_timestamp(value)
         return ts[:10]  # "2026-03-30T14:30:00" → "2026-03-30"
 
-    def _extract_shift_date_from_filename(self) -> str | None:
+    def _extract_shift_date_from_filename(self) -> str:
         """
-        Try to extract a date from the filename.
+        Extract a date from the filename. NEVER returns None — always produces a valid date.
         Supports multiple VB naming conventions:
           "VE20260330.TXT"  → "2026-03-30"  (YYYYMMDD)
           "VE30032026.TXT"  → "2026-03-30"  (DDMMYYYY)
           "C250374.TXT"     → "2026-03-25"  (DDMM + turno, year from file mtime)
           "P310393.TXT"     → "2026-03-31"  (DDMM + turno, year from file mtime)
-        Returns None if no date found in filename.
+        Fallback: uses file modification date if filename doesn't match any pattern.
         """
         # Try YYYYMMDD pattern in filename (8 consecutive digits)
         match = re.search(r'(\d{4})(\d{2})(\d{2})', self.file_name)
@@ -222,7 +222,12 @@ class BaseParser(ABC):
                 return d.isoformat()
             except (ValueError, OSError):
                 pass
-        return None
+        # FALLBACK: use file modification date (never fail)
+        try:
+            mtime = os.path.getmtime(self.file_path)
+            return date.fromtimestamp(mtime).isoformat()
+        except OSError:
+            return date.today().isoformat()
 
     def _get_file_mtime_ts(self) -> str:
         """

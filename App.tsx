@@ -428,7 +428,6 @@ const Dashboard: React.FC = () => {
               <PlayaView
                 stations={stations}
                 dailyClosings={dailyClosings}
-                salesTransactions={salesTransactions}
                 activeStationId={activeStationId}
                 onStationChange={setActiveStationId}
               />
@@ -441,7 +440,6 @@ const Dashboard: React.FC = () => {
               <ShopView
                 stations={stations}
                 dailyClosings={dailyClosings}
-                salesTransactions={salesTransactions}
                 activeStationId={activeStationId}
                 onStationChange={setActiveStationId}
               />

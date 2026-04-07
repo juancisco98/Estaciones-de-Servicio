@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Droplets, AlertTriangle, TrendingDown, ChevronDown, ChevronUp } from 'lucide-react';
 import { Station, User } from '../types';
 import { useTankLevels } from '../hooks/useTankLevels';
+import { useDataContext } from '../context/DataContext';
 import { TANK_WARNING_LITERS, TANK_CRITICAL_LITERS } from '../constants';
 import StationFilter from './StationFilter';
 
@@ -115,9 +116,16 @@ const StationTankPanel: React.FC<{ station: Station }> = ({ station }) => {
                                     <p className={`text-base font-black ${textColor}`}>
                                         {tank.levelLiters.toLocaleString('es-AR', { maximumFractionDigits: 0 })} L
                                     </p>
-                                    <p className="text-xs text-gray-400 dark:text-slate-500">
-                                        {new Date(tank.recordedAt).toLocaleString('es-AR', { timeStyle: 'short', dateStyle: 'short' })}
-                                    </p>
+                                    {(() => {
+                                        const ageHours = (Date.now() - new Date(tank.recordedAt).getTime()) / 3600000;
+                                        const isStale = ageHours > 12;
+                                        return (
+                                            <p className={`text-xs font-medium ${isStale ? 'text-amber-600 dark:text-amber-400' : 'text-gray-400 dark:text-slate-500'}`}>
+                                                {isStale && '⚠ '}
+                                                {new Date(tank.recordedAt).toLocaleString('es-AR', { timeStyle: 'short', dateStyle: 'short' })}
+                                            </p>
+                                        );
+                                    })()}
                                 </div>
                                 {(tank.soldLiters != null || tank.soldAmount != null) && (
                                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200 dark:border-slate-700">
@@ -144,7 +152,14 @@ const StationTankPanel: React.FC<{ station: Station }> = ({ station }) => {
 
 const TankLevelsView: React.FC<TankLevelsViewProps> = ({ stations, currentUser, activeStationId, onStationChange }) => {
     const { getLowTanks, getCriticalTanks } = useTankLevels();
+    const { refreshData } = useDataContext();
     const [selectedStationId, setSelectedStationId] = useState<string | null>(activeStationId ?? null);
+
+    // Force fresh fetch when entering this view
+    useEffect(() => {
+        refreshData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleStationChange = (id: string | null) => {
         setSelectedStationId(id);

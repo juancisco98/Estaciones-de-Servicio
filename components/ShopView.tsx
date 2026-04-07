@@ -1,15 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { ShoppingBag, Search, ChevronDown, ChevronUp } from 'lucide-react';
-import { Station, DailyClosing, SalesTransaction } from '../types';
-import VeTransactionList from './VeTransactionList';
+import { Station, DailyClosing } from '../types';
 import StationFilter from './StationFilter';
-import TurnoFilter, { Turno, getTurnoFromTs, getTurnoFromClosingTs } from './TurnoFilter';
+import TurnoFilter, { Turno, getTurnoFromClosingTs } from './TurnoFilter';
 import { getArgentinaToday } from '../utils/dateUtils';
 
 interface ShopViewProps {
     stations: Station[];
     dailyClosings: DailyClosing[];
-    salesTransactions: SalesTransaction[];
     activeStationId?: string | null;
     onStationChange?: (id: string | null) => void;
 }
@@ -24,9 +22,6 @@ interface DayRow {
     closingTs?: string;
     totalsSnapshot?: Record<string, number>;
     total: number;
-    productCount: number;
-    txCount: number;
-    source: 'S' | 'VE';
 }
 
 const _SUMMARY_LABELS = new Set(['TOTAL SALE', 'TOTAL ENTRA', 'TOTAL COMBUSTIBLES']);
@@ -52,7 +47,7 @@ const SnapshotBreakdown: React.FC<{ snapshot: Record<string, number> }> = ({ sna
     );
 };
 
-const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, salesTransactions, activeStationId, onStationChange }) => {
+const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, activeStationId, onStationChange }) => {
     const [search, setSearch] = useState('');
     const [dateFrom, setDateFrom] = useState(getArgentinaToday);
     const [dateTo, setDateTo] = useState(getArgentinaToday);
@@ -82,9 +77,6 @@ const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, salesTrans
                 closingTs: c.sClosingTs,
                 totalsSnapshot: c.sTotalsSnapshot,
                 total: c.shopTotal!,
-                productCount: 0,
-                txCount: 0,
-                source: 'S' as const,
             }));
 
         if (search.trim()) {
@@ -160,23 +152,11 @@ const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, salesTrans
                                     </div>
                                     <div className="text-right shrink-0 mr-2">
                                         <p className="text-sm font-bold text-gray-900 dark:text-white">{fmt(row.total)}</p>
-                                        <p className="text-[10px] text-gray-400 dark:text-slate-500">{row.productCount} productos</p>
                                     </div>
                                     {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
                                 </button>
-                                {isExpanded && (
-                                    <>
-                                        {row.totalsSnapshot && <SnapshotBreakdown snapshot={row.totalsSnapshot} />}
-                                        <VeTransactionList
-                                            title="DETALLE VENTAS MINI MERCADO (VE)"
-                                            transactions={salesTransactions.filter(t =>
-                                                t.stationId === row.stationId &&
-                                                t.shiftDate === row.shiftDate &&
-                                                t.areaCode === 0 &&
-                                                (!row.closingTs || getTurnoFromTs(t.transactionTs) === getTurnoFromClosingTs(row.closingTs))
-                                            )}
-                                        />
-                                    </>
+                                {isExpanded && row.totalsSnapshot && (
+                                    <SnapshotBreakdown snapshot={row.totalsSnapshot} />
                                 )}
                             </div>
                         );

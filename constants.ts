@@ -107,9 +107,11 @@ export const TRANSACTIONS_LOAD_DAYS = 90;
 
 // Real-time channel names
 export const RT_CHANNELS = {
-  SALES:        'sales_transactions_realtime',
-  TANKS:        'tank_levels_realtime',
-  CLOSINGS:     'daily_closings_realtime',
-  ALERTS:       'alerts_realtime',
-  NOTIFICATIONS:'notifications_realtime',
+  SALES:         'sales_transactions_realtime',
+  TANKS:         'tank_levels_realtime',
+  CLOSINGS:      'daily_closings_realtime',
+  CARD_PAYMENTS: 'card_payments_realtime',
+  CASH_CLOSINGS: 'cash_closings_realtime',
+  ALERTS:        'alerts_realtime',
+  NOTIFICATIONS: 'notifications_realtime',
 } as const;

@@ -26,7 +26,6 @@ If |declared_total - computed_total| / declared_total > 0.001 → DISCREPANCY
 from __future__ import annotations
 
 import re
-import uuid
 
 from .base_parser import BaseParser, ParseResult
 
@@ -95,9 +94,11 @@ class SParser(BaseParser):
             )
 
         shift_date = self._extract_shift_date_from_filename()
+        if not shift_date:
+            result.add_error(0, "", f"Cannot extract date from filename {self.file_name!r}")
+            return result
 
         record = {
-            "id":              str(uuid.uuid4()),
             "station_id":      self.station_id,
             "shift_date":      shift_date,
             "shop_total":      str(shop_total) if shop_total is not None else None,

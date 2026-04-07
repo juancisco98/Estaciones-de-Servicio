@@ -109,7 +109,12 @@ class StateManager:
     def is_processed(self, file_path: str, md5: str) -> bool:
         with self._lock:
             entry = self._state.get(file_path)
-            return entry is not None and entry.get("md5") == md5
+            if entry is None:
+                return False
+            if entry.get("md5") == md5:
+                return True
+            # File content changed — allow reprocessing
+            return False
 
     def mark_processed(
         self,
@@ -118,13 +123,25 @@ class StateManager:
         records_inserted: int,
         errors: list[str],
     ) -> None:
-
         with self._lock:
             self._state[file_path] = {
                 "md5":              md5,
                 "processed_at":     datetime.utcnow().isoformat() + "Z",
                 "records_inserted": records_inserted,
                 "error_count":      len(errors),
+            }
+            self._save()
+
+    def mark_failed(self, file_path: str, md5: str, error: str) -> None:
+        """Track upload failure. File will be retried on next scan — never discarded."""
+        with self._lock:
+            entry = self._state.get(file_path, {})
+            prev_count = entry.get("fail_count", 0) if entry.get("md5") == md5 else 0
+            self._state[file_path] = {
+                "md5":          md5,
+                "fail_count":   prev_count + 1,
+                "last_error":   error,
+                "last_failed":  datetime.utcnow().isoformat() + "Z",
             }
             self._save()
 
@@ -181,8 +198,9 @@ def process_file(
                 os.path.basename(file_path), file_size, max_file_bytes,
             )
             return
-    except OSError:
-        pass  # file may have been deleted, let MD5 step handle it
+    except OSError as exc:
+        logger.warning("Cannot stat %s: %s — will retry on next event", os.path.basename(file_path), exc)
+        return
 
     try:
         file_md5 = _md5(file_path)
@@ -222,7 +240,7 @@ def process_file(
             from alert_checker import AlertChecker
             AlertChecker(uploader).check_alerts(result, station_id)
         except Exception as exc:
-            logger.debug("Alert check skipped: %s", exc)
+            logger.warning("Alert check failed: %s", exc)
 
         # Solo marcar como procesado si el upload fue exitoso
         state.mark_processed(
@@ -236,8 +254,9 @@ def process_file(
             result.file_name, result.lines_ok, result.lines_parsed, len(result.errors),
         )
     else:
-        # NO marcar como procesado — se reintentara en el proximo scan
-        logger.error("FAIL %s: upload failed - se reintentara en el proximo escaneo", result.file_name)
+        # Marcar fallo — se reintentará en el próximo escaneo (nunca se descarta)
+        state.mark_failed(file_path, file_md5, f"Upload failed for {result.file_name}")
+        logger.error("FAIL %s: upload failed — se reintentará en el próximo escaneo", result.file_name)
 
 
 # ─── Watchdog event handler ───────────────────────────────────────────────────
@@ -406,7 +425,7 @@ def main(config_path: Path = _DEFAULT_CONFIG, stop_event: Event | None = None) -
                         uploader.update_scan_status(req_id, "completed", len(scan_files))
                         logger.info("Scan request %s completed: %d files scanned", req_id[:8], len(scan_files))
                 except Exception as exc:
-                    logger.debug("Scan request poll error: %s", exc)
+                    logger.warning("Scan request poll error: %s", exc)
     except KeyboardInterrupt:
         logger.info("Shutdown requested...")
     finally:

@@ -205,6 +205,10 @@ if ([string]::IsNullOrWhiteSpace($StationUUID)) {
 Write-Host ""
 Write-Host "[4/6] Instalando archivos..." -ForegroundColor Yellow
 
+# Detener servicio existente ANTES de copiar archivos (evita corrupción de state.json)
+sc.exe stop StationOSEdgeAgent 2>$null | Out-Null
+Start-Sleep -Seconds 2
+
 New-Item -ItemType Directory -Path $INSTALL_DIR -Force | Out-Null
 New-Item -ItemType Directory -Path "$INSTALL_DIR\logs" -Force | Out-Null
 New-Item -ItemType Directory -Path "$INSTALL_DIR\logs\dead_letter" -Force | Out-Null
@@ -223,9 +227,14 @@ Copy-Item "$scriptDir\*.py" $INSTALL_DIR -Force
 Copy-Item "$scriptDir\parsers" "$INSTALL_DIR\parsers" -Recurse -Force
 Copy-Item "$scriptDir\requirements.txt" $INSTALL_DIR -Force
 Copy-Item "$scriptDir\install.bat" $INSTALL_DIR -Force
-Copy-Item "$scriptDir\scan.bat" $INSTALL_DIR -Force
 
 Write-Host "  OK: Archivos copiados a $INSTALL_DIR" -ForegroundColor Green
+
+# Limpiar cache para forzar reprocesamiento de todos los archivos
+Remove-Item "$INSTALL_DIR\state.json" -ErrorAction SilentlyContinue
+Remove-Item "$INSTALL_DIR\__pycache__" -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item "$INSTALL_DIR\parsers\__pycache__" -Recurse -Force -ErrorAction SilentlyContinue
+Write-Host "  OK: Cache limpiado (state.json + __pycache__)" -ForegroundColor Green
 
 # ─── Step 5: Generate Config Files ────────────────────────────────────────────
 
@@ -348,7 +357,7 @@ try {
     Write-Host "  OK: Servicio registrado" -ForegroundColor Green
 } catch {
     Write-Host "  WARN: No se pudo registrar servicio Windows: $_" -ForegroundColor Yellow
-    Write-Host "  Los datos se procesaran con scan.bat en su lugar." -ForegroundColor Yellow
+    Write-Host "  Los datos se procesaran con la tarea programada en su lugar." -ForegroundColor Yellow
 }
 
 # 6f. Configurar arranque automatico y recuperacion ante fallos

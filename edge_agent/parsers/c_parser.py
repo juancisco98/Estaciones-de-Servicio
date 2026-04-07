@@ -39,8 +39,6 @@ from __future__ import annotations
 
 import re
 import uuid
-from datetime import date as _date
-
 from .base_parser import BaseParser, ParseResult
 
 
@@ -101,6 +99,10 @@ class CParser(BaseParser):
         result = self._make_result()
         lines = self._read_lines()
 
+        # Extract once before loop (idempotent — same result every call)
+        shift_date = self._extract_shift_date_from_filename()
+        payment_ts = self._get_file_mtime_ts()
+
         for line_num, raw_line in enumerate(lines, start=1):
             line = raw_line.rstrip("\r\n")
             if not line.strip():
@@ -108,6 +110,9 @@ class CParser(BaseParser):
 
             m = _C_LINE_RE.match(line)
             if not m:
+                # Log unmatched non-empty lines (likely VB corruption like "% 95179928312.37D+%5")
+                if line.strip() and any(c.isdigit() for c in line):
+                    result.add_error(line_num, line, "Line does not match C format — possible VB corruption")
                 continue
 
             result.lines_parsed += 1
@@ -135,16 +140,11 @@ class CParser(BaseParser):
                     f"(code {account_code})"
                 )
 
-            # Shift date extracted from filename (C300389 -> date 30/03, shift 89)
-            shift_date = self._extract_shift_date_from_filename()
-            if not shift_date:
-                shift_date = _date.today().isoformat()
-
             record = {
                 "id":             str(uuid.uuid4()),
                 "station_id":     self.station_id,
                 "file_name":      self.file_name,
-                "payment_ts":     self._get_file_mtime_ts(),
+                "payment_ts":     payment_ts,
                 "payment_type":   _map_payment_type(account_code),
                 "account_name":   account_name,
                 "amount":         str(amount),

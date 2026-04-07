@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import os
 import re
-import uuid
 
 from .base_parser import BaseParser, ParseResult
 
@@ -65,14 +64,21 @@ class AParser(BaseParser):
             return result
 
         shift_date = self._extract_shift_date_from_filename()
+        if not shift_date:
+            result.add_error(0, "", f"Cannot extract date from filename {self.file_name!r}")
+            return result
 
         # Extract sequential turno from filename (A02040 → digits "02040" → turno after DDMM)
-        import re as _re
-        digits = _re.sub(r'^[A-Z]+', '', os.path.splitext(self.file_name)[0].upper())
-        turno = int(digits[4:]) if len(digits) > 4 else 0
+        name_no_ext = os.path.splitext(self.file_name)[0].upper()
+        # Extract only leading digits after prefix letter(s)
+        digit_match = re.search(r'[A-Z]+(\d+)', name_no_ext)
+        if digit_match:
+            digits = digit_match.group(1)
+            turno = int(digits[4:]) if len(digits) > 4 else 0
+        else:
+            turno = 0
 
         record = {
-            "id":             str(uuid.uuid4()),
             "station_id":     self.station_id,
             "shift_date":     shift_date,
             "turno":          turno,

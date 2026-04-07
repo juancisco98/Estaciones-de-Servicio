@@ -29,8 +29,8 @@ const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ stations, salesTran
     const filtered = useMemo(() => {
         let list = salesTransactions;
         if (selectedStation) list = list.filter(t => t.stationId === selectedStation);
-        list = list.filter(t => t.shiftDate >= dateFrom && t.shiftDate <= dateTo);
-        if (selectedTurno) list = list.filter(t => getTurnoFromTs(t.transactionTs) === selectedTurno);
+        list = list.filter(t => t.shiftDate && t.shiftDate >= dateFrom && t.shiftDate <= dateTo);
+        if (selectedTurno) list = list.filter(t => t.transactionTs && getTurnoFromTs(t.transactionTs) === selectedTurno);
         if (selectedSector === 'PLAYA') list = list.filter(t => t.areaCode === 1);
         if (selectedSector === 'SHOP') list = list.filter(t => t.areaCode === 0);
         if (search.trim()) {
@@ -41,7 +41,7 @@ const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ stations, salesTran
                 (t.paymentMethod ?? '').toLowerCase().includes(q)
             );
         }
-        return list.sort((a, b) => b.transactionTs.localeCompare(a.transactionTs));
+        return list.sort((a, b) => (b.transactionTs ?? '').localeCompare(a.transactionTs ?? ''));
     }, [salesTransactions, selectedStation, dateFrom, dateTo, selectedTurno, selectedSector, search]);
 
     const totalRevenue   = filtered.reduce((s, t) => s + t.totalAmount, 0);
@@ -193,7 +193,10 @@ const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ stations, salesTran
                                         }`}
                                     >
                                         <td className="px-5 py-4 whitespace-nowrap text-xs text-gray-500 dark:text-slate-400 font-mono">
-                                            {new Date(t.transactionTs).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}
+                                            <span>{t.shiftDate ? t.shiftDate.split('-').reverse().join('/') : '—'}</span>
+                                            <span className="ml-1.5 text-gray-400 dark:text-slate-500">
+                                                {t.transactionTs ? new Date(t.transactionTs).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Buenos_Aires' }) : '—'}
+                                            </span>
                                         </td>
                                         {currentUser?.role === 'ADMIN' && (
                                             <td className="px-5 py-4 text-xs text-gray-600 dark:text-gray-300 max-w-[120px] truncate">

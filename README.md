@@ -9,22 +9,22 @@ Station-OS ingesta automáticamente los archivos `.TXT` generados por el sistema
 ## Arquitectura
 
 ```
-D:\SVAPP\<station_code>\*.TXT   ← Sistema legacy VB escribe archivos aquí
-        ↓ watchdog FileSystemEventHandler
+C:\SVAPP\*.TXT                  ← Sistema legacy VB escribe archivos aquí
+        ↓ watchdog FileSystemEventHandler + debounce 2s
 edge_agent/watcher.py           ← Detecta archivos nuevos/modificados
         ↓ MD5 idempotency check (state.json)
-edge_agent/parsers/             ← VEParser, CParser, TParser, PParser, SParser
+edge_agent/parsers/             ← VEParser, CParser, TParser, PParser, SParser, AParser
         ↓ ParseResult: records + errors + raw_line
-edge_agent/uploader.py          ← POST a Supabase REST (service_role key)
+edge_agent/uploader.py          ← POST a Supabase REST (service_role key, retry 5xx)
         ↓
-Supabase PostgreSQL              ← sales_transactions, tank_levels, card_payments, daily_closings
-        ↓ Edge Function webhook
-cloud_logic/reconciler          ← Reconciliación P+S vs suma VE
-cloud_logic/anomaly_detector    ← Negativos, varianza de caja, tanques bajos
-        ↓ INSERT en tabla alerts
+Supabase PostgreSQL             ← sales_transactions, tank_levels, card_payments,
+                                   daily_closings, cash_closings
+        ↓
 Supabase Realtime               ← postgres_changes → React frontend
         ↓
-React PWA                        ← MapBoard (60 estaciones), AlertsView, ReconciliationView
+React PWA                       ← Dashboard con vistas por archivo:
+                                   Ventas (VE), Playa (P), Mini Mercado (S),
+                                   Tanques (T), Cuentas Corrientes (C), Caja (A)
 ```
 
 ---
@@ -34,10 +34,9 @@ React PWA                        ← MapBoard (60 estaciones), AlertsView, Recon
 | Capa | Tecnología |
 |---|---|
 | Frontend | React 19 + TypeScript 5.8 + Vite 6 |
-| Estilos | Tailwind CSS v4 (dark mode class-based) |
+| Estilos | Tailwind CSS (dark mode class-based) |
 | Backend/DB | Supabase (PostgreSQL + Realtime + Auth) |
-| Edge Agent | Python 3.11+ (watchdog, httpx, pydantic) |
-| Cloud Logic | Google Cloud Functions (Python 3.11) |
+| Edge Agent | Python 3.11+ (watchdog, httpx, tenacity, PyYAML) |
 | Mapas | Leaflet + React-Leaflet |
 | Gráficos | Recharts |
 | Notificaciones | Sonner (toasts) |
@@ -46,128 +45,126 @@ React PWA                        ← MapBoard (60 estaciones), AlertsView, Recon
 
 ---
 
+## Setup — Edge Agent (Instalación en estación)
+
+El edge agent se instala en la PC servidor de la estación donde el sistema VB escribe los archivos `.TXT` en `C:\SVAPP`.
+
+**Requisitos:** Windows 10+, Python 3.11+, acceso a `C:\SVAPP`
+
+```powershell
+# 1. Copiar carpeta edge_agent a la PC del cliente (ej: vía pendrive)
+
+# 2. Abrir PowerShell como Administrador y ejecutar:
+cd C:\ruta\a\edge_agent
+powershell -ExecutionPolicy Bypass -File setup.ps1
+
+# El instalador pregunta:
+#   - Email del dueño (para acceso al dashboard)
+#   - Nombre de la estación
+#   - Dirección (se geocodifica automáticamente)
+```
+
+### Qué hace setup.ps1:
+1. Verifica Python 3.11+ (instala si falta)
+2. Registra la estación en Supabase (no duplica si ya existe)
+3. Para el servicio existente (si hay reinstalación)
+4. Copia archivos a `C:\StationOS`
+5. Limpia `state.json` y `__pycache__` (fuerza reprocesamiento)
+6. Genera `config.yaml` y `.env`
+7. Instala dependencias Python
+8. Registra e inicia servicio Windows (`StationOSEdgeAgent`)
+9. Configura tarea programada de respaldo (06:15, 14:15, 22:15)
+
+### Comandos manuales del servicio:
+```powershell
+sc.exe stop StationOSEdgeAgent     # Detener
+sc.exe start StationOSEdgeAgent    # Iniciar
+sc.exe query StationOSEdgeAgent    # Ver estado
+```
+
+---
+
 ## Setup — Frontend
 
 **Requisitos:** Node.js 20+
 
 ```bash
-# 1. Clonar el repositorio
-git clone <repo-url>
-cd station-os
-
-# 2. Instalar dependencias
+# 1. Instalar dependencias
 npm install
 
-# 3. Configurar variables de entorno
+# 2. Configurar variables de entorno
 cp .env.example .env.local
-# Editar .env.local con los valores de tu proyecto Supabase:
+# Editar .env.local:
 #   VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
 #   VITE_SUPABASE_ANON_KEY=tu-anon-key
 
-# 4. Iniciar servidor de desarrollo
+# 3. Desarrollo
 npm run dev
-# → http://localhost:3000
 
-# 5. Build de producción
+# 4. Producción
 npm run build
-npm run preview
-```
-
----
-
-## Setup — Edge Agent (Windows)
-
-El edge agent se instala en la computadora **servidor de la estación**, donde vive `D:\SVAPP`.
-
-**Requisitos:** Python 3.11+, acceso al directorio `D:\SVAPP`
-
-```bash
-cd edge_agent
-
-# 1. Crear entorno virtual e instalar dependencias
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-
-# 2. Configurar credenciales
-cp config.yaml.example config.yaml
-# Editar config.yaml:
-#   supabase.url: <tu Supabase URL>
-#   supabase.service_key_env: SUPABASE_SERVICE_KEY
-#   watcher.watch_path: D:\SVAPP
-#   stations:
-#     EST_001: <uuid de la estación en Supabase>
-
-# Crear .env con la service key (nunca commitear este archivo)
-echo SUPABASE_SERVICE_KEY=tu-service-role-key > .env
-
-# 3. Probar en modo debug (sin instalar servicio)
-python -m edge_agent.watcher --config config.yaml
-# o usando el script de gestión:
-install.bat debug
-
-# 4. Instalar como servicio de Windows (ejecutar como Administrador)
-install.bat install
-install.bat start
-install.bat status
-```
-
-### Comandos del agente
-
-```
-install.bat install   → Registrar servicio de Windows
-install.bat start     → Iniciar el servicio
-install.bat stop      → Detener el servicio
-install.bat restart   → Reiniciar
-install.bat status    → Ver estado actual
-install.bat remove    → Desregistrar el servicio
-install.bat debug     → Ejecutar interactivamente (sin servicio)
-install.bat logs      → Tail del log en tiempo real
-```
-
----
-
-## Setup — Cloud Functions (Google Cloud)
-
-**Requisitos:** `gcloud` CLI autenticado, proyecto GCP configurado
-
-```bash
-cd cloud_logic
-
-# Configurar variables
-export GCP_PROJECT_ID=tu-proyecto-gcp
-export SUPABASE_URL=https://tu-proyecto.supabase.co
-export SUPABASE_SERVICE_KEY=tu-service-role-key
-
-# Desplegar las tres funciones
-chmod +x deploy.sh
-./deploy.sh
 ```
 
 ---
 
 ## Setup — Base de Datos Supabase
 
-```bash
-# Aplicar el schema completo de Station-OS
-supabase db push
-# o ejecutar directamente:
-# supabase/migrations/20260401_station_os_schema.sql
+Ejecutar en el SQL Editor de Supabase en este orden:
+
+```sql
+-- 1. Schema base
+-- Ejecutar: supabase/migrations/20260401_station_os_schema.sql
+
+-- 2. Multi-tenant
+-- Ejecutar: supabase/migrations/20260402_multi_tenant.sql
+
+-- 3. Turno + área + tanques dinámicos
+-- Ejecutar: models/20260403_turno_area_dynamic_tanks.sql
+
+-- 4. Columnas adicionales (P/S snapshots, cash_closings)
+ALTER TABLE daily_closings ADD COLUMN IF NOT EXISTS closing_ts TIMESTAMPTZ;
+ALTER TABLE daily_closings ADD COLUMN IF NOT EXISTS p_closing_ts TIMESTAMPTZ;
+ALTER TABLE daily_closings ADD COLUMN IF NOT EXISTS s_closing_ts TIMESTAMPTZ;
+ALTER TABLE daily_closings ADD COLUMN IF NOT EXISTS p_totals_snapshot JSONB;
+ALTER TABLE daily_closings ADD COLUMN IF NOT EXISTS s_totals_snapshot JSONB;
+ALTER TABLE daily_closings ADD COLUMN IF NOT EXISTS totals_snapshot JSONB;
+ALTER TABLE tank_levels ADD COLUMN IF NOT EXISTS shift_date DATE;
+
+CREATE TABLE IF NOT EXISTS cash_closings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    station_id UUID NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
+    shift_date DATE NOT NULL,
+    turno INT,
+    caja_total NUMERIC(14,2),
+    cheque_total NUMERIC(14,2),
+    closing_ts TIMESTAMPTZ,
+    a_file_name TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (station_id, shift_date, turno)
+);
+ALTER TABLE cash_closings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Admin full access" ON cash_closings FOR ALL USING (is_admin());
+
+NOTIFY pgrst, 'reload schema';
 ```
-
-El schema crea las tablas: `stations`, `employees`, `operator_auth`, `sales_transactions`, `card_payments`, `tank_levels`, `daily_closings`, `alerts`, `station_knowledge`, `allowed_emails`, `notifications`.
-
-**RLS:** Los administradores se autentican vía `allowed_emails`. Los operadores solo ven datos de su estación (vía `operator_auth`).
 
 ---
 
-## Deploy Frontend — Vercel
+## Tipos de Archivos VB
 
-En el dashboard de Vercel, conectar el repositorio y configurar:
-- Framework: Vite
-- Build command: `npm run build`
-- Output dir: `dist`
-- Variables de entorno: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+| Prefijo | Tabla Supabase | Vista Frontend | Contenido |
+|---|---|---|---|
+| `VE*.TXT` | `sales_transactions` | Historial de Ventas | Cada venta individual (producto, litros, precio, hora) |
+| `P*.TXT` | `daily_closings` | Playa | Totales del turno playa (combustibles, efectivo, tarjetas) |
+| `S*.TXT` | `daily_closings` | Mini Mercado | Totales del turno salón (ventas, tarjetas) |
+| `T*.TXT` | `tank_levels` | Niveles de Tanques | Stock por tanque TQ1–TQ99 al cierre |
+| `C*.TXT` | `card_payments` | Cuentas Corrientes | Saldos de tarjetas y cuentas de clientes |
+| `A*.TXT` | `cash_closings` | Caja | Efectivo y cheques al cierre del turno |
+
+### Nomenclatura de archivos
+- Formato: `PREFIJO + DDMM + TURNO_SEQ.TXT` (ej: `P01041.TXT` = Playa, día 01, mes 04, turno 1)
+- 18 archivos por día por estación: 3 de cada tipo (P/S/C/T/A) + 1 VE acumulativo
+- VE: `VEDDMM + SEQ.TXT` (ej: `VE04046.TXT` = día 04, mes 04, secuencia 6)
 
 ---
 
@@ -175,55 +172,49 @@ En el dashboard de Vercel, conectar el repositorio y configurar:
 
 ```
 station-os/
-├── edge_agent/              ← Agente Python local (corre en servidor de estación)
-│   ├── watcher.py           ← Monitor watchdog + pipeline principal
-│   ├── uploader.py          ← Upload autenticado a Supabase REST
-│   ├── service.py           ← Wrapper Windows Service (pywin32)
-│   ├── install.bat          ← Gestión del servicio de Windows
-│   ├── config.yaml          ← Configuración de estaciones y Supabase
+├── edge_agent/                 ← Agente Python local (corre en servidor de estación)
+│   ├── watcher.py              ← Monitor watchdog + state.json + scan_requests
+│   ├── uploader.py             ← Upload a Supabase REST (retry 5xx, dead_letter)
+│   ├── service.py              ← Windows Service (StationOSEdgeAgent)
+│   ├── setup.ps1               ← Instalador automático (3 preguntas)
 │   ├── requirements.txt
 │   └── parsers/
-│       ├── ve_parser.py     ← VE*.TXT — líneas de venta
-│       ├── c_parser.py      ← C*.TXT — pagos con tarjeta/cuenta
-│       ├── t_parser.py      ← T*.TXT — niveles de tanques
-│       ├── p_parser.py      ← P*.TXT — totales playa
-│       └── s_parser.py      ← S*.TXT — totales tienda
-├── cloud_logic/             ← Google Cloud Functions
-│   ├── reconciler/          ← Reconcilia totales declarados vs transacciones
-│   ├── anomaly_detector/    ← Detecta anomalías operativas
-│   └── knowledge_updater/   ← Clasifica productos desconocidos
-├── supabase/
-│   └── migrations/
-│       └── 20260401_station_os_schema.sql
-├── components/              ← Componentes React
-├── context/                 ← DataContext (estado global + real-time)
-├── hooks/                   ← Hooks por entidad (useStations, useAlerts, etc.)
-├── types/                   ← Interfaces TypeScript
-├── utils/                   ← Mappers, helpers
-└── services/                ← Clientes Supabase + Cloud Functions
+│       ├── base_parser.py      ← Clase abstracta + encoding + shift_date extraction
+│       ├── ve_parser.py        ← VE*.TXT — ventas individuales
+│       ├── p_parser.py         ← P*.TXT — totales playa
+│       ├── s_parser.py         ← S*.TXT — totales salón
+│       ├── t_parser.py         ← T*.TXT — niveles de tanques
+│       ├── c_parser.py         ← C*.TXT — cuentas corrientes/tarjetas
+│       └── a_parser.py         ← A*.TXT — caja (efectivo + cheques)
+├── components/                 ← Componentes React
+│   ├── Header.tsx              ← Indicador de salud por estación (ONLINE/LENTO/OFFLINE)
+│   ├── PlayaView.tsx           ← Desglose archivo P (solo SnapshotBreakdown)
+│   ├── ShopView.tsx            ← Desglose archivo S (solo SnapshotBreakdown)
+│   ├── CajaView.tsx            ← Efectivo + cheques (archivo A)
+│   ├── SalesHistoryView.tsx    ← Historial de ventas VE (filtro sector playa/salon)
+│   ├── CardPaymentsView.tsx    ← Cuentas corrientes (archivo C)
+│   ├── TankLevelsView.tsx      ← Niveles de tanques (archivo T)
+│   └── TurnoFilter.tsx         ← getTurnoFromTs() + getTurnoFromClosingTs()
+├── context/
+│   └── DataContext.tsx         ← Estado global + subscripciones real-time
+├── types/                      ← Interfaces TypeScript
+├── utils/                      ← Mappers, dateUtils, helpers
+├── services/                   ← Cliente Supabase
+└── supabase/migrations/        ← Schema SQL
 ```
-
----
-
-## Tipos de Archivos VB
-
-| Prefijo | Tabla Supabase | Contenido |
-|---|---|---|
-| `VE*.TXT` | `sales_transactions` | Líneas de venta (timestamp, producto, litros, precio) |
-| `C*.TXT` | `card_payments` | Pagos con tarjeta / cuentas corrientes |
-| `T*.TXT` | `tank_levels` | Niveles de tanques TQ1–TQ5 |
-| `P*.TXT` | `daily_closings` | Total playa declarado |
-| `S*.TXT` | `daily_closings` | Total tienda declarado |
 
 ---
 
 ## Garantías del Sistema
 
-- **No destructivo:** El edge agent **nunca modifica** los archivos `.TXT` originales en `D:\SVAPP`.
+- **No destructivo:** El edge agent **nunca modifica** los archivos `.TXT` originales en `C:\SVAPP`.
 - **Idempotente:** Re-procesar el mismo archivo (mismo MD5) no duplica registros.
+- **Ningún archivo se descarta:** Si un upload falla, se reintenta indefinidamente hasta que funcione.
 - **Audit trail:** Cada registro incluye `raw_line` con la línea original sin modificar.
-- **Tolerancia de reconciliación:** `ABS(diff / total) ≤ 0.1%` → RECONCILED, > 0.1% → DISCREPANCY + alerta CRITICAL.
-- **Servicio persistente:** El edge agent corre como Windows Service con reinicio automático ante fallos.
+- **Tolerancia de reconciliación:** `ABS(diff / total) ≤ 0.1%` → RECONCILED, > 0.1% → DISCREPANCY.
+- **Servicio persistente:** El edge agent corre como Windows Service con reinicio automático ante fallos + tarea programada de respaldo cada 8 horas.
+- **Monitoreo remoto:** El dashboard muestra el estado de cada estación (ONLINE/LENTO/OFFLINE) basado en la última sincronización.
+- **Timezone:** Todos los timestamps son Argentina UTC-3 (sin horario de verano desde 2009).
 
 ---
 

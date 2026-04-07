@@ -31,6 +31,7 @@ Anomaly thresholds (from station_knowledge):
 """
 from __future__ import annotations
 
+import os
 import re
 import uuid
 from datetime import datetime
@@ -39,31 +40,51 @@ from .base_parser import BaseParser, ParseResult
 
 
 _T_LINE_RE = re.compile(
-    r'^(\d{2}-\d{2}-\d{2,4})\s+'       # [1] date DD-MM-YY or DD-MM-YYYY
-    r'(\d{2}:\d{2})\s+'                 # [2] time HH:MM
-    r'TQ\s+(\d+)\s+'                    # [3] tank number (1-5)
-    r'LTS\.:\s*([\d.,]+)\s+'            # [4] liters dispensed this shift
-    r'\$\s*([\d.,]+)\s+'                # [5] value dispensed ($)
-    r'(.+?)\s+'                         # [6] product_name (non-greedy)
-    r'STOCK:\s*([\d.,]+)\s+'            # [7] current stock liters ← KEY
-    r'TURNO\s+(\d+)\s+'                 # [8] turno
-    r'PLAYA\s+(\d+)\s+'                 # [9] playa
-    r'(?:NRO\.BOCA|NR\.BCA)\s+%?(\d+)\s*$'  # [10] nozzle/boca (Matheu: NRO.BOCA 520, Campana: NR.BCA %151847)
+    r'^(\d{2}-\d{2}-\d{2,4})\s+'        # [1] date DD-MM-YY or DD-MM-YYYY
+    r'(\d{2}:\d{2})\s+'                  # [2] time HH:MM
+    r'TQ\s*(\d+)\s+'                     # [3] tank number (espacio opcional después de TQ)
+    r'LTS[\.:]+\s*([\d.,\-]+)\s+'        # [4] liters dispensed (acepta LTS. LTS: LTS.:)
+    r'\$?\s*([\d.,\-]+)\s+'              # [5] value dispensed (símbolo $ opcional)
+    r'(.+?)\s+'                          # [6] product_name (non-greedy)
+    r'STOCK[\.:]+\s*([\d.,\-]+)\s+'      # [7] current stock (acepta STOCK. STOCK: STOCK.:)
+    r'TURNO\s+(\d+)\s+'                  # [8] turno
+    r'PLAYA\s+(\d+)'                     # [9] playa
+    r'(?:\s+(?:NRO\.BOCA|NR\.BCA)\s+%?(\d+))?'  # [10] nozzle (entirely optional)
+    r'\s*$'
 )
 
 
 # No hardcoded limit — accept any tank number (1-99)
 
 
-def _parse_t_date(date_str: str, hhmm: str) -> str:
+def _parse_t_date(date_str: str, hhmm: str, file_path: str | None = None) -> str:
     """
     Parse DD-MM-YY or DD-MM-YYYY + HH:MM → ISO 8601 with Argentina timezone.
     The times in the files are local Argentina time (UTC-3).
+
+    For 2-digit years: VB systems may write truncated years (e.g. "20" for 2026).
+    We use the file's modification time year as the correct year, since the file
+    was just created by the VB system.
     """
-    year_part = date_str.split("-")[2]
-    fmt = "%d-%m-%Y" if len(year_part) == 4 else "%d-%m-%y"
-    dt = datetime.strptime(f"{date_str} {hhmm}", f"{fmt} %H:%M")
-    # Files are written in Argentina local time (UTC-3)
+    parts = date_str.split("-")
+    dd, mm, year_part = parts[0], parts[1], parts[2]
+
+    if len(year_part) == 4:
+        year = int(year_part)
+    else:
+        # 2-digit year: use file mtime year (more reliable than Python's %y pivot)
+        year = None
+        if file_path:
+            try:
+                mtime = os.path.getmtime(file_path)
+                year = datetime.fromtimestamp(mtime).year
+            except OSError:
+                pass
+        if year is None:
+            year = datetime.now().year
+
+    dt = datetime(year, int(mm), int(dd),
+                  int(hhmm[:2]), int(hhmm[3:5]))
     return dt.isoformat() + "-03:00"
 
 
@@ -85,6 +106,9 @@ class TParser(BaseParser):
 
             m = _T_LINE_RE.match(line)
             if not m:
+                # Log lines that look like data but don't match (helps diagnose VB format changes)
+                if line.strip() and ('TQ' in line.upper() or 'STOCK' in line.upper()):
+                    result.add_error(line_num, line, "Line does not match T format — possible VB format change")
                 continue
 
             result.lines_parsed += 1
@@ -100,7 +124,7 @@ class TParser(BaseParser):
                 continue
 
             try:
-                recorded_at = _parse_t_date(ddmmyy, hhmm)
+                recorded_at = _parse_t_date(ddmmyy, hhmm, self.file_path)
                 level_liters = self._parse_decimal(stock_str)
                 liters_dispensed = self._parse_decimal(liters_dispensed_str)
             except ValueError as exc:
@@ -123,11 +147,18 @@ class TParser(BaseParser):
                 "_liters_dispensed":   str(liters_dispensed),
                 "_turno":              int(turno_str),
                 "_playa":              int(playa_str),
-                "_nozzle":             int(nozzle_str),
+                "_nozzle":             int(nozzle_str) if nozzle_str else 0,
                 "raw_line":            line,
             }
 
             result.records.append(record)
             result.lines_ok += 1
+
+        # Force visible error if file produced 0 records (likely regex mismatch)
+        if result.lines_ok == 0 and len(lines) > 0:
+            result.add_error(
+                0, "",
+                f"T file produced 0 records from {len(lines)} lines — regex may not match VB format"
+            )
 
         return result

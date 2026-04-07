@@ -130,7 +130,7 @@ class SupabaseUploader:
             len(clean_records), result.file_name, table,
         )
 
-        success = self._upsert_batch(table, clean_records, on_conflict, result.file_name)
+        success, error_detail = self._upsert_batch(table, clean_records, on_conflict, result.file_name)
 
         if success:
             logger.info(
@@ -139,7 +139,7 @@ class SupabaseUploader:
             # Edge Functions are optional — only trigger if deployed
             # Skip silently if not available (404)
         else:
-            self._write_dead_letter(result)
+            self._write_dead_letter(result, last_error=error_detail)
 
         return success
 
@@ -149,7 +149,7 @@ class SupabaseUploader:
         records: list[dict],
         on_conflict: str,
         source_file: str,
-    ) -> bool:
+    ) -> tuple[bool, str]:
         """
         POST records to Supabase REST with upsert semantics.
         Retries on transient network errors with exponential backoff.
@@ -164,27 +164,37 @@ class SupabaseUploader:
             before_sleep=before_sleep_log(logger, logging.WARNING),
         )
         def _do_post() -> httpx.Response:
-            return httpx.post(
+            resp = httpx.post(
                 url,
                 json=records,
                 headers=self._headers,
                 params=params,
                 timeout=30.0,
             )
+            # Retry on server errors (Supabase outage, overload)
+            if resp.status_code >= 500:
+                logger.warning(
+                    "Supabase 5xx (%d) for %s -> %s, retrying: %s",
+                    resp.status_code, source_file, table, resp.text[:200],
+                )
+                raise httpx.NetworkError(f"Server error {resp.status_code}")
+            return resp
 
         try:
             resp = _do_post()
             if resp.status_code in (200, 201):
-                return True
-            # 409 Conflict with merge-duplicates should not happen, but handle gracefully
+                return True, ""
+            # Log 4xx errors with full detail for debugging
+            error_msg = f"HTTP {resp.status_code}: {resp.text[:500]}"
             logger.error(
                 "Supabase error %d for %s -> %s: %s",
                 resp.status_code, source_file, table, resp.text[:500],
             )
-            return False
+            return False, error_msg
         except Exception as exc:
+            error_msg = f"Exception after retries: {exc}"
             logger.error("Upload failed for %s after retries: %s", source_file, exc)
-            return False
+            return False, error_msg
 
     def _call_edge_function(self, payload: dict, label: str) -> None:
         """
@@ -217,13 +227,14 @@ class SupabaseUploader:
             f"AnomalyDetection({file_type})",
         )
 
-    def _write_dead_letter(self, result: ParseResult) -> None:
+    def _write_dead_letter(self, result: ParseResult, last_error: str = "") -> None:
         """
         Write a failed upload to the dead letter directory for manual review.
-        File: logs/dead_letter/<file_name>_<timestamp>.json
+        Overwrites previous dead_letter for the same file (no accumulation).
+        File: logs/dead_letter/<file_name>.json
         """
         ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        dead_file = self.dead_letter_dir / f"{result.file_name}_{ts}.json"
+        dead_file = self.dead_letter_dir / f"{result.file_name}.json"
         payload = {
             "source_file":  result.raw_file,
             "file_name":    result.file_name,
@@ -232,6 +243,7 @@ class SupabaseUploader:
             "records":      result.records,
             "errors":       result.errors,
             "failed_at":    ts,
+            "last_error":   last_error,
         }
         dead_file.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
         logger.error("Dead letter written: %s", dead_file)

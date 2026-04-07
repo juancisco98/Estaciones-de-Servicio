@@ -1,15 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { Fuel, Search, ChevronDown, ChevronUp } from 'lucide-react';
-import { Station, DailyClosing, SalesTransaction } from '../types';
-import VeTransactionList from './VeTransactionList';
+import { Station, DailyClosing } from '../types';
 import StationFilter from './StationFilter';
-import TurnoFilter, { Turno, getTurnoFromTs, getTurnoFromClosingTs } from './TurnoFilter';
+import TurnoFilter, { Turno, getTurnoFromClosingTs } from './TurnoFilter';
 import { getArgentinaToday } from '../utils/dateUtils';
 
 interface PlayaViewProps {
     stations: Station[];
     dailyClosings: DailyClosing[];
-    salesTransactions: SalesTransaction[];
     activeStationId?: string | null;
     onStationChange?: (id: string | null) => void;
 }
@@ -24,8 +22,6 @@ interface DayRow {
     closingTs?: string;
     totalsSnapshot?: Record<string, number>;
     total: number;
-    txCount: number;
-    source: 'P' | 'VE';  // P file or derived from VE
 }
 
 // Labels to exclude from the P/S file breakdown (they are summary totals, not line items)
@@ -52,7 +48,7 @@ const SnapshotBreakdown: React.FC<{ snapshot: Record<string, number> }> = ({ sna
     );
 };
 
-const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, salesTransactions, activeStationId, onStationChange }) => {
+const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, activeStationId, onStationChange }) => {
     const [search, setSearch] = useState('');
     const [dateFrom, setDateFrom] = useState(getArgentinaToday);
     const [dateTo, setDateTo] = useState(getArgentinaToday);
@@ -82,8 +78,6 @@ const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, salesTra
                 closingTs: c.pClosingTs,
                 totalsSnapshot: c.pTotalsSnapshot,
                 total: c.forecourtTotal!,
-                txCount: 0,
-                source: 'P' as const,
             }));
 
         if (search.trim()) {
@@ -154,28 +148,15 @@ const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, salesTra
                                                 {getTurnoFromClosingTs(row.closingTs) === 'MANANA' ? 'Mañana' : getTurnoFromClosingTs(row.closingTs) === 'TARDE' ? 'Tarde' : 'Noche'}
                                             </span>
                                         )}
-                                        <span className="text-[10px] text-gray-300 dark:text-slate-600 ml-2">
-                                            {row.source === 'P' ? '(archivo P)' : '(datos VE)'}
-                                        </span>
+                                        <span className="text-[10px] text-gray-300 dark:text-slate-600 ml-2">(archivo P)</span>
                                     </div>
                                     <div className="text-right shrink-0 mr-2">
                                         <p className="text-sm font-bold text-gray-900 dark:text-white">{fmt(row.total)}</p>
                                     </div>
                                     {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
                                 </button>
-                                {isExpanded && (
-                                    <>
-                                        {row.totalsSnapshot && <SnapshotBreakdown snapshot={row.totalsSnapshot} />}
-                                        <VeTransactionList
-                                            title="DETALLE VENTAS COMBUSTIBLE (VE)"
-                                            transactions={salesTransactions.filter(t =>
-                                                t.stationId === row.stationId &&
-                                                t.shiftDate === row.shiftDate &&
-                                                t.areaCode === 1 &&
-                                                (!row.closingTs || getTurnoFromTs(t.transactionTs) === getTurnoFromClosingTs(row.closingTs))
-                                            )}
-                                        />
-                                    </>
+                                {isExpanded && row.totalsSnapshot && (
+                                    <SnapshotBreakdown snapshot={row.totalsSnapshot} />
                                 )}
                             </div>
                         );
