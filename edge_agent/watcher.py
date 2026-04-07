@@ -249,14 +249,30 @@ def process_file(
             records_inserted=result.lines_ok,
             errors=result.errors,
         )
-        logger.info(
-            "%s: %d/%d lines -> Supabase (%d errors)",
-            result.file_name, result.lines_ok, result.lines_parsed, len(result.errors),
-        )
+        # EXTRA visible logging for T and A files (the ones we're debugging)
+        prefix = result.file_name[0].upper() if result.file_name else ""
+        if prefix in ("T", "A"):
+            logger.info(
+                ">>> %s FILE OK: %s | records=%d lines=%d/%d errors=%d",
+                prefix, result.file_name, len(result.records),
+                result.lines_ok, result.lines_parsed, len(result.errors),
+            )
+        else:
+            logger.info(
+                "%s: %d/%d lines -> Supabase (%d errors)",
+                result.file_name, result.lines_ok, result.lines_parsed, len(result.errors),
+            )
     else:
         # Marcar fallo — se reintentará en el próximo escaneo (nunca se descarta)
         state.mark_failed(file_path, file_md5, f"Upload failed for {result.file_name}")
-        logger.error("FAIL %s: upload failed — se reintentará en el próximo escaneo", result.file_name)
+        prefix = result.file_name[0].upper() if result.file_name else ""
+        if prefix in ("T", "A"):
+            logger.error(
+                ">>> %s FILE FAIL: %s | UPLOAD FAILED — ver dead_letter para detalles",
+                prefix, result.file_name,
+            )
+        else:
+            logger.error("FAIL %s: upload failed — se reintentará en el próximo escaneo", result.file_name)
 
 
 # ─── Watchdog event handler ───────────────────────────────────────────────────

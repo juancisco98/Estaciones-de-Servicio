@@ -227,6 +227,7 @@ Copy-Item "$scriptDir\*.py" $INSTALL_DIR -Force
 Copy-Item "$scriptDir\parsers" "$INSTALL_DIR\parsers" -Recurse -Force
 Copy-Item "$scriptDir\requirements.txt" $INSTALL_DIR -Force
 Copy-Item "$scriptDir\install.bat" $INSTALL_DIR -Force
+if (Test-Path "$scriptDir\DIAGNOSTICO.bat") { Copy-Item "$scriptDir\DIAGNOSTICO.bat" $INSTALL_DIR -Force }
 
 Write-Host "  OK: Archivos copiados a $INSTALL_DIR" -ForegroundColor Green
 

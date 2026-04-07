@@ -20,8 +20,8 @@ from .base_parser import BaseParser, ParseResult
 
 
 _A_LINE_RE = re.compile(
-    r'^(.+?)\s{2,}'        # [1] label (non-greedy, stops at 2+ spaces)
-    r'(-?[\d,\.]+)\s*$'    # [2] amount (decimal, can be negative)
+    r'^([A-Za-z\s\.\-]+?)\s+'   # [1] label (alphabetic + spaces, non-greedy)
+    r'(-?[\d,\.]+)\s*$'         # [2] amount (decimal, can be negative)
 )
 
 
@@ -44,6 +44,9 @@ class AParser(BaseParser):
 
             m = _A_LINE_RE.match(line)
             if not m:
+                # Log lines that look like data but don't match
+                if line.strip() and any(c.isdigit() for c in line):
+                    result.add_error(line_num, line, "Line does not match A format — possible VB format change")
                 continue
 
             result.lines_parsed += 1
