@@ -2,14 +2,18 @@ import { useCallback } from 'react';
 import { TankLevel, TankId } from '../types';
 import { useDataContext } from '../context/DataContext';
 import { TANK_WARNING_LITERS, TANK_CRITICAL_LITERS } from '../constants';
+import { getArgentinaToday } from '../utils/dateUtils';
 
 export const useTankLevels = () => {
     const { tankLevels } = useDataContext();
 
     const getLatestByStation = useCallback((stationId: string): Map<TankId, TankLevel> => {
+        const today = getArgentinaToday();
         const map = new Map<TankId, TankLevel>();
-        const stationTanks = tankLevels.filter(t => t.stationId === stationId);
-        for (const t of stationTanks) {
+        for (const t of tankLevels) {
+            if (t.stationId !== stationId) continue;
+            const recordedDay = new Date(t.recordedAt).toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+            if (recordedDay !== today) continue;
             const existing = map.get(t.tankId);
             if (!existing || t.recordedAt > existing.recordedAt) {
                 map.set(t.tankId, t);
