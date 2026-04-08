@@ -1,8 +1,4 @@
-/**
- * Station-OS — Database row types (snake_case).
- * Mirrors: supabase/migrations/20260401_station_os_schema.sql
- * Used exclusively in mapper functions (dbTo* / *ToDb).
- */
+
 
 export interface DbStationRow {
   id: string;
@@ -27,7 +23,7 @@ export interface DbEmployeeRow {
   station_id: string;
   name: string;
   email?: string | null;
-  role: string;           // 'MANAGER' | 'ATTENDANT' | 'CASHIER'
+  role: string;
   is_active: boolean;
   hire_date?: string | null;
   notes?: string | null;
@@ -81,7 +77,7 @@ export interface DbTankLevelRow {
   file_name: string;
   recorded_at: string;
   shift_date?: string | null;
-  tank_id: string;         // 'TQ1', 'TQ2', ..., 'TQN' (dynamic)
+  tank_id: string;
   product_code: string;
   product_name: string;
   level_liters: number | string;
@@ -110,7 +106,7 @@ export interface DbDailyClosingRow {
   reconciliation_ok: boolean;
   p_file_name?: string | null;
   s_file_name?: string | null;
-  status: string;         // 'PENDING' | 'RECONCILED' | 'DISCREPANCY'
+  status: string;
   notes?: string | null;
   created_at?: string;
   updated_at?: string;
@@ -131,7 +127,7 @@ export interface DbCashClosingRow {
 export interface DbAlertRow {
   id: string;
   station_id?: string | null;
-  level: string;          // 'CRITICAL' | 'WARNING' | 'INFO'
+  level: string;
   type: string;
   title: string;
   message: string;

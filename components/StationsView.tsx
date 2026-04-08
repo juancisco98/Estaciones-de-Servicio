@@ -72,7 +72,6 @@ const StationsView: React.FC<StationsViewProps> = ({
 
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
-            {/* Header */}
             <div className="shrink-0 p-5 pb-4 bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-white/10">
                 <div className="flex items-center justify-between gap-3 mb-4">
                     <div className="flex items-center gap-3">
@@ -119,8 +118,6 @@ const StationsView: React.FC<StationsViewProps> = ({
                     </label>
                 </div>
             </div>
-
-            {/* Station grid */}
             <div className="flex-1 overflow-y-auto p-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                     {filtered.map(station => {
@@ -176,8 +173,6 @@ const StationsView: React.FC<StationsViewProps> = ({
                                     )}
                                     {station.phone && <span>{station.phone}</span>}
                                 </div>
-
-                                {/* Actions */}
                                 <div className="flex items-center gap-2.5 pt-2 border-t border-gray-50 dark:border-white/5">
                                     <button
                                         onClick={() => onViewOnMap(station)}
@@ -266,8 +261,6 @@ const StationsView: React.FC<StationsViewProps> = ({
                     </div>
                 )}
             </div>
-
-            {/* Station Form Modal */}
             {showModal && (
                 <StationFormModal
                     station={editingStation}

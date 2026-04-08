@@ -24,7 +24,6 @@ interface DayRow {
     total: number;
 }
 
-// Labels to exclude from the P/S file breakdown (they are summary totals, not line items)
 const _SUMMARY_LABELS = new Set(['TOTAL SALE', 'TOTAL ENTRA', 'TOTAL COMBUSTIBLES']);
 
 const SnapshotBreakdown: React.FC<{ snapshot: Record<string, number> }> = ({ snapshot }) => {
@@ -63,7 +62,6 @@ const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, activeSt
 
     const stationMap = useMemo(() => new Map(stations.map(s => [s.id, s.name])), [stations]);
 
-    // Build rows ONLY from P files (daily_closings with forecourtTotal)
     const dayRows = useMemo(() => {
         let results: DayRow[] = dailyClosings
             .filter(c => c.forecourtTotal != null)
@@ -92,7 +90,6 @@ const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, activeSt
     }, [dailyClosings, selectedStationId, selectedTurno, dateFrom, dateTo, search, stationMap]);
 
     const totalPlaya = dayRows.reduce((sum, d) => sum + d.total, 0);
-
 
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">

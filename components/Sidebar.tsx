@@ -88,7 +88,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                     : '4px 0 32px rgba(0,0,0,0.12), 2px 0 8px rgba(0,0,0,0.06)',
             }}
         >
-            {/* Header */}
             <div className="px-6 pt-6 pb-5 flex justify-between items-center border-b border-gray-100/80 dark:border-white/5 shrink-0">
                 <div className="flex items-center gap-3.5">
                     <div
@@ -117,8 +116,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                     </button>
                 )}
             </div>
-
-            {/* Nav */}
             <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
                 {menuItems.map((item) => {
                     const isActive = currentView === item.id;
@@ -162,11 +159,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     );
                 })}
             </nav>
-
-            {/* Footer */}
             <div className="p-5 border-t border-gray-100/80 dark:border-white/5 space-y-3 shrink-0">
-
-                {/* Refresh button */}
                 {onRefresh && (
                     <button
                         onClick={onRefresh}
@@ -185,8 +178,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                         </span>
                     </button>
                 )}
-
-                {/* Dark mode toggle */}
                 <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-gray-50/80 dark:bg-slate-800/60">
                     <div className="flex items-center gap-3">
                         <div className="p-2 rounded-xl bg-white dark:bg-slate-700/60" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
@@ -199,7 +190,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                             {theme === 'dark' ? 'Modo Noche' : 'Modo Día'}
                         </span>
                     </div>
-                    {/* pill toggle */}
                     <button
                         onClick={toggleTheme}
                         className="relative w-[44px] h-[24px] rounded-full cursor-pointer shrink-0
@@ -226,8 +216,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                         />
                     </button>
                 </div>
-
-                {/* User info */}
                 {currentUser && (
                     <div className="flex items-center gap-3 px-3 py-2">
                         {currentUser.photoURL ? (
@@ -243,8 +231,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                         </div>
                     </div>
                 )}
-
-                {/* Logout */}
                 {onLogout && (
                     <button
                         onClick={onLogout}

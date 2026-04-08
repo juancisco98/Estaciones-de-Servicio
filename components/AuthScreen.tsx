@@ -27,7 +27,6 @@ const AuthScreen: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-[5000] bg-slate-950 flex items-center justify-center p-4">
-      {/* Background */}
       <div className="absolute inset-0 z-0">
         <img
           src="https://images.unsplash.com/photo-1545262810-77515befe149?q=80&w=2070&auto=format&fit=crop"
@@ -36,8 +35,6 @@ const AuthScreen: React.FC = () => {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-slate-900/40" />
       </div>
-
-      {/* Card */}
       <div
           className="relative z-10 w-full max-w-md p-10 rounded-3xl animate-spring-in"
           style={{
@@ -48,7 +45,6 @@ const AuthScreen: React.FC = () => {
               boxShadow: '0 32px 80px rgba(0,0,0,0.60), 0 8px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.08)',
           }}
       >
-        {/* Logo */}
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-amber-500/20 border border-amber-400/30 mb-5">
             <Fuel className="w-10 h-10 text-amber-400" />

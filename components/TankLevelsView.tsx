@@ -60,7 +60,6 @@ const StationTankPanel: React.FC<{ station: Station }> = ({ station }) => {
                 boxShadow: '0 0 0 1px rgba(0,0,0,0.04), 0 2px 12px rgba(0,0,0,0.07), 0 6px 24px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.80)',
             }}
         >
-            {/* Station header */}
             <button
                 className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
                 onClick={() => setExpanded(v => !v)}
@@ -91,8 +90,6 @@ const StationTankPanel: React.FC<{ station: Station }> = ({ station }) => {
                     {expanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
                 </div>
             </button>
-
-            {/* Tanks grid */}
             {expanded && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 p-5 border-t border-gray-50 dark:border-white/5">
                     {tanks.map(([tankId, tank]) => {
@@ -155,10 +152,8 @@ const TankLevelsView: React.FC<TankLevelsViewProps> = ({ stations, currentUser, 
     const { refreshData } = useDataContext();
     const [selectedStationId, setSelectedStationId] = useState<string | null>(activeStationId ?? null);
 
-    // Force fresh fetch when entering this view
     useEffect(() => {
         refreshData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const handleStationChange = (id: string | null) => {
@@ -182,7 +177,6 @@ const TankLevelsView: React.FC<TankLevelsViewProps> = ({ stations, currentUser, 
 
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
-            {/* Header */}
             <div className="shrink-0 p-5 pb-4 bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-white/10">
                 <div className="flex items-center gap-3 mb-4">
                     <Droplets className="w-6 h-6 text-blue-500" />
@@ -211,8 +205,6 @@ const TankLevelsView: React.FC<TankLevelsViewProps> = ({ stations, currentUser, 
                     </div>
                 </div>
             </div>
-
-            {/* Station panels */}
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
                 {activeStations.map(station => (
                     <StationTankPanel key={station.id} station={station} />

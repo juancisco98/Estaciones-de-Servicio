@@ -8,13 +8,11 @@ export const TURNO_LABELS: Record<Turno, string> = {
     NOCHE:  'Noche (22-6)',
 };
 
-/** Convert UTC timestamp to Argentina hour (UTC-3, no DST since 2009). */
 const getArgHour = (ts: string): number => {
     const d = new Date(ts);
     return (d.getUTCHours() - 3 + 24) % 24;
 };
 
-/** Turno from a VE transaction timestamp (sale time = when it happened). */
 export const getTurnoFromTs = (ts: string): Turno => {
     const h = getArgHour(ts);
     if (h >= 6 && h < 14) return 'MANANA';
@@ -22,9 +20,6 @@ export const getTurnoFromTs = (ts: string): Turno => {
     return 'NOCHE';
 };
 
-/** Turno from a closing file timestamp (P/S/C/T/A file mtime).
- *  The file is generated at the END of a shift (~14:03 = Mañana closing).
- *  Subtracts 30min to classify into the shift that just ended. */
 export const getTurnoFromClosingTs = (ts: string): Turno => {
     const d = new Date(ts);
     d.setMinutes(d.getMinutes() - 30);

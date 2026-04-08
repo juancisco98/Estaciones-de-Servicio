@@ -1,16 +1,8 @@
-/**
- * Station-OS — Knowledge Service
- *
- * Handles all client-side calls related to station_knowledge:
- *  - fetchStationKnowledge: read the knowledge blob(s) directly from Supabase
- *  - classifyEntity: POST to the classify-entity Edge Function (→ knowledge_updater GCF)
- */
+
 
 import { supabase } from './supabaseClient';
 import { dbToStationKnowledge } from '../utils/mappers';
 import { StationKnowledge, ProductType, AccountType } from '../types';
-
-// ── Read ──────────────────────────────────────────────────────────────────────
 
 export async function fetchStationKnowledge(stationId?: string): Promise<StationKnowledge[]> {
   let query = supabase
@@ -24,8 +16,6 @@ export async function fetchStationKnowledge(stationId?: string): Promise<Station
   if (error) throw error;
   return (data ?? []).map(dbToStationKnowledge);
 }
-
-// ── Write (via Edge Function → GCF) ──────────────────────────────────────────
 
 export interface ClassifyProductPayload {
   stationId: string;

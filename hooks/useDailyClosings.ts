@@ -22,7 +22,6 @@ export const useDailyClosings = () => {
         dailyClosings.filter(c => c.status === status),
     [dailyClosings]);
 
-    /** Fetch the latest closing for each station — used for MapBoard status icons. */
     const getLatestPerStation = useCallback((): Map<string, DailyClosing> => {
         const map = new Map<string, DailyClosing>();
         for (const c of dailyClosings) {
@@ -34,7 +33,6 @@ export const useDailyClosings = () => {
         return map;
     }, [dailyClosings]);
 
-    /** Manually add notes to a closing (admin only). */
     const addNotes = useCallback(async (id: string, notes: string): Promise<boolean> => {
         try {
             const { data, error } = await supabase

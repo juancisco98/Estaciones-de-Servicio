@@ -54,7 +54,6 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({
 
     return (
         <>
-            {/* More menu overlay */}
             {showMore && (
                 <>
                     <div className="fixed inset-0 bg-black/30 z-[1998]" onClick={() => setShowMore(false)} />
@@ -99,8 +98,6 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({
                     </div>
                 </>
             )}
-
-            {/* Bottom Tab Bar */}
             <div
                 className={`${className} relative flex items-stretch
                             bg-white/85 dark:bg-slate-900/90
@@ -121,7 +118,6 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({
                                        transition-all duration-150 active:scale-90"
                             style={{ WebkitTapHighlightColor: 'transparent' }}
                         >
-                            {/* Active background pill */}
                             {isActive && (
                                 <span
                                     className="absolute inset-x-3 top-1.5 bottom-1.5 rounded-2xl pointer-events-none"
@@ -130,8 +126,6 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({
                                     }}
                                 />
                             )}
-
-                            {/* Icon container */}
                             <div
                                 className="relative z-10 transition-all duration-200"
                                 style={{
@@ -154,8 +148,6 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({
                                     </span>
                                 )}
                             </div>
-
-                            {/* Label */}
                             <span
                                 className={`text-[11px] font-semibold relative z-10 transition-colors ${
                                     isActive ? 'text-amber-500 font-bold' : 'text-gray-400 dark:text-slate-500'
@@ -163,8 +155,6 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({
                             >
                                 {label}
                             </span>
-
-                            {/* Top indicator bar */}
                             <span
                                 className="absolute top-0 left-1/2 -translate-x-1/2 h-[3.5px] rounded-b-full
                                            bg-gradient-to-r from-amber-400 to-amber-600
@@ -177,8 +167,6 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({
                         </button>
                     );
                 })}
-
-                {/* More button */}
                 <button
                     onClick={() => setShowMore(v => !v)}
                     className="flex-1 flex flex-col items-center justify-center py-3 gap-1 min-h-[56px] relative

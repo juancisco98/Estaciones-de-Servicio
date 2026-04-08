@@ -20,14 +20,11 @@ if (supabaseUrl && supabaseAnonKey) {
     logger.warn('[Supabase] Missing env vars. Running in offline mode.');
 }
 
-// Export a proxy that won't crash when supabase is null.
-// All .from() calls will return errors caught by data hooks' try/catch.
 export const supabase: SupabaseClient = supabaseInstance || new Proxy({} as SupabaseClient, {
     get(_target, prop) {
         if (prop === 'from') {
             return () => new Proxy({}, {
                 get(_t, method) {
-                    // Return empty data for select/insert/update/delete prevents crashes
                     if (['select', 'insert', 'update', 'delete', 'upsert'].includes(method as string)) {
                         logger.error(`[Supabase Proxy] Attempted ${String(method)} on missing client.`);
                         return () => Promise.resolve({ data: [], error: { message: 'Supabase not configured (Missing Envs)' } });
@@ -53,7 +50,6 @@ import { Capacitor } from '@capacitor/core';
 export const signInWithGoogle = async () => {
     if (!supabaseInstance) return { error: { message: 'Supabase not configured' } };
 
-    // Determine the redirect URL based on platform
     const isNative = Capacitor.isNativePlatform();
     const redirectToUrl = isNative ? 'com.stationos.app://login-callback' : window.location.origin;
 

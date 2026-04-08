@@ -1,12 +1,3 @@
-"""
-Station-OS Edge Agent — Alert Checker
-Generates automatic alerts after successful file uploads.
-
-Triggered by watcher.py after each upload. Routes to file-type checks:
-  T files → tank level alerts (CRITICAL/WARNING)
-  VE files → negative quantity alerts (CRITICAL)
-  P/S files → reconciliation alerts (CRITICAL if mismatch > 0.1%)
-"""
 from __future__ import annotations
 
 import logging
@@ -21,25 +12,17 @@ except ImportError:
 
 logger = logging.getLogger("station_os.alert_checker")
 
-# ── Thresholds (defaults — station_knowledge can override) ───────────────────
-
 TANK_WARNING_LITERS = 800
 TANK_CRITICAL_LITERS = 300
-RECONCILIATION_TOLERANCE = 0.001  # 0.1%
+RECONCILIATION_TOLERANCE = 0.001
 MAX_ALERTS_PER_FILE = 5
 
 
 class AlertChecker:
-    """
-    Checks ParseResult for anomalies and inserts alerts via Supabase REST.
-    Called from watcher.py after each successful upload.
-    """
-
     def __init__(self, uploader: SupabaseUploader):
         self.uploader = uploader
 
     def check_alerts(self, result: ParseResult, station_id: str) -> None:
-        """Route to file-type-specific checks."""
         ft = result.file_type
         if ft == "T":
             self._check_tank_levels(result, station_id)
@@ -48,16 +31,12 @@ class AlertChecker:
         elif ft in ("P", "S"):
             self._check_reconciliation(result, station_id)
 
-    # ── Tank level alerts ────────────────────────────────────────────────────
-
     def _get_owner_thresholds(self, station_id: str) -> tuple[int, int]:
-        """Fetch owner-configured tank thresholds, fallback to defaults."""
         url = f"{self.uploader.base_url}/rest/v1/owner_preferences"
         params = {
             "select": "tank_warning_liters,tank_critical_liters",
             "limit": "1",
         }
-        # Try station-specific first, then global
         for sid_filter in [f"eq.{station_id}", "is.null"]:
             params["station_id"] = sid_filter
             headers = {**self.uploader._headers, "Prefer": "return=representation"}
@@ -73,7 +52,6 @@ class AlertChecker:
         return (TANK_WARNING_LITERS, TANK_CRITICAL_LITERS)
 
     def _is_notification_enabled(self, station_id: str, alert_type: str) -> bool:
-        """Check if owner has this notification type enabled."""
         type_to_field = {
             "LOW_TANK_LEVEL": "notify_tank_low",
             "CRITICAL_TANK_LEVEL": "notify_tank_critical",
@@ -82,7 +60,7 @@ class AlertChecker:
         }
         field = type_to_field.get(alert_type)
         if not field:
-            return True  # Unknown type → always notify
+            return True
 
         url = f"{self.uploader.base_url}/rest/v1/owner_preferences"
         params = {"select": field, "station_id": "is.null", "limit": "1"}
@@ -93,7 +71,7 @@ class AlertChecker:
                 return bool(resp[0].get(field, True))
         except Exception:
             pass
-        return True  # On error → default to enabled
+        return True
 
     def _check_tank_levels(self, result: ParseResult, station_id: str) -> None:
         if not self._is_notification_enabled(station_id, "LOW_TANK_LEVEL"):
@@ -149,8 +127,6 @@ class AlertChecker:
                 )
                 alerts_created += 1
 
-    # ── Negative quantity alerts ─────────────────────────────────────────────
-
     def _check_negative_quantities(self, result: ParseResult, station_id: str) -> None:
         if not self._is_notification_enabled(station_id, "NEGATIVE_VALUE"):
             return
@@ -176,8 +152,7 @@ class AlertChecker:
                 alert_type="NEGATIVE_VALUE",
                 title=f"Venta negativa: {product} ({qty})",
                 message=f"Cantidad negativa {qty} para {product}. "
-                        f"Monto: ${total}. Archivo: {result.file_name}. "
-                        f"Puede ser anulacion legitima o error.",
+                        f"Monto: ${total}. Archivo: {result.file_name}.",
                 related_date=shift_date,
                 related_file=result.file_name,
                 metadata={"product_name": product, "quantity": qty,
@@ -186,13 +161,7 @@ class AlertChecker:
             )
             alerts_created += 1
 
-    # ── Reconciliation alerts ────────────────────────────────────────────────
-
     def _check_reconciliation(self, result: ParseResult, station_id: str) -> None:
-        """
-        After P or S file: compare declared total against sum of VE transactions.
-        Only alerts if both declared total and VE data exist for the same date.
-        """
         if not self._is_notification_enabled(station_id, "RECONCILIATION_FAIL"):
             return
         if not result.records:
@@ -203,7 +172,6 @@ class AlertChecker:
         if not shift_date:
             return
 
-        # Get declared total from P or S
         if result.file_type == "P":
             declared_str = record.get("forecourt_total")
         else:
@@ -216,10 +184,9 @@ class AlertChecker:
         if declared == 0:
             return
 
-        # Query VE sum for same station + date
         ve_sum = self._get_ve_sum(station_id, shift_date, result.file_type)
         if ve_sum is None:
-            return  # No VE data yet — can't compare
+            return
 
         diff = abs(declared - ve_sum)
         pct = diff / abs(declared) if declared != 0 else 0
@@ -235,8 +202,7 @@ class AlertChecker:
                 alert_type="RECONCILIATION_FAIL",
                 title=f"{area}: diferencia ${int(diff)} ({pct:.1%})",
                 message=f"{area} declara ${declared:,.0f} pero VE suma ${ve_sum:,.0f}. "
-                        f"Diferencia: ${diff:,.0f} ({pct:.2%}). "
-                        f"Tolerancia: {RECONCILIATION_TOLERANCE:.1%}.",
+                        f"Diferencia: ${diff:,.0f} ({pct:.2%}).",
                 related_date=shift_date,
                 related_file=result.file_name,
                 metadata={"declared_total": declared, "computed_total": ve_sum,
@@ -245,14 +211,12 @@ class AlertChecker:
             )
 
     def _get_ve_sum(self, station_id: str, shift_date: str, file_type: str) -> float | None:
-        """Query Supabase for sum of VE transactions on this date."""
         url = f"{self.uploader.base_url}/rest/v1/sales_transactions"
         params = {
             "station_id": f"eq.{station_id}",
             "shift_date": f"eq.{shift_date}",
             "select": "total_amount",
         }
-        # P = playa (area_code=1), S = salon (area_code=0)
         if file_type == "P":
             params["area_code"] = "eq.1"
         else:
@@ -268,8 +232,6 @@ class AlertChecker:
             logger.debug("Could not fetch VE sum: %s", exc)
             return None
 
-    # ── Idempotency ──────────────────────────────────────────────────────────
-
     def _alert_exists(
         self,
         station_id: str,
@@ -277,7 +239,6 @@ class AlertChecker:
         related_date: str | None = None,
         related_file: str | None = None,
     ) -> bool:
-        """Check if unresolved alert already exists."""
         url = f"{self.uploader.base_url}/rest/v1/alerts"
         params: dict[str, str] = {
             "station_id": f"eq.{station_id}",
@@ -296,4 +257,4 @@ class AlertChecker:
             resp = self.uploader._http_get(url, params, headers)
             return bool(resp)
         except Exception:
-            return False  # On error, allow insert (better to alert twice than miss)
+            return False

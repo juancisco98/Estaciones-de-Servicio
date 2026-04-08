@@ -5,12 +5,10 @@ import { useDataContext } from '../context/DataContext';
 export const useCardPayments = () => {
     const { cardPayments } = useDataContext();
 
-    /** All payments for a given station. */
     const getByStation = useCallback((stationId: string): CardPayment[] =>
         cardPayments.filter(p => p.stationId === stationId),
     [cardPayments]);
 
-    /** Payments for a date range (inclusive). */
     const getByDateRange = useCallback((
         from: string,
         to: string,
@@ -24,12 +22,10 @@ export const useCardPayments = () => {
         ),
     [cardPayments]);
 
-    /** Filter by payment type. */
     const getByPaymentType = useCallback((type: PaymentMethod): CardPayment[] =>
         cardPayments.filter(p => p.paymentType === type),
     [cardPayments]);
 
-    /** Group by payment type for a date range. */
     const getPaymentTypeBreakdown = useCallback((
         from: string,
         to: string,

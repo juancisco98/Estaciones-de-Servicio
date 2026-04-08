@@ -2,9 +2,6 @@ import { supabase } from '../services/supabaseClient';
 import { logger } from './logger';
 import { handleError } from './errorHandler';
 
-/**
- * Generic wrapper for Supabase upsert operations with optimistic updates.
- */
 export async function supabaseUpsert<T>(
     table: string,
     dbRow: Record<string, unknown> | Record<string, unknown>[],
@@ -28,9 +25,6 @@ export async function supabaseUpsert<T>(
     }
 }
 
-/**
- * Generic wrapper for Supabase delete operations.
- */
 export async function supabaseDelete(
     table: string,
     id: string,
@@ -54,9 +48,6 @@ export async function supabaseDelete(
     }
 }
 
-/**
- * Generic wrapper for Supabase update operations.
- */
 export async function supabaseUpdate(
     table: string,
     id: string,
@@ -81,9 +72,6 @@ export async function supabaseUpdate(
     }
 }
 
-/**
- * Generic wrapper for Supabase insert operations.
- */
 export async function supabaseInsert(
     table: string,
     row: Record<string, unknown>,

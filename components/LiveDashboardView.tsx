@@ -167,7 +167,6 @@ const LiveDashboardView: React.FC<LiveDashboardViewProps> = ({
 
     return (
         <div className="h-full flex flex-col bg-slate-50/80 dark:bg-slate-950 overflow-hidden">
-            {/* KPI header */}
             <div className="shrink-0 p-4 pb-3">
                 <div className="flex items-center gap-2 mb-4">
                     <div className="w-7 h-7 bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl flex items-center justify-center shadow-sm shadow-amber-400/30">
@@ -213,8 +212,6 @@ const LiveDashboardView: React.FC<LiveDashboardViewProps> = ({
                     />
                 </div>
             </div>
-
-            {/* Station table */}
             <div className="flex-1 overflow-y-auto px-4 pb-4">
                 <div
                     className="bg-white dark:bg-slate-900 rounded-2xl overflow-hidden

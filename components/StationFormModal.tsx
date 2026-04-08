@@ -3,7 +3,7 @@ import { X, Loader2, MapPin, Phone, User, Hash, FolderOpen, StickyNote, Save } f
 import { Station } from '../types';
 
 interface StationFormModalProps {
-    station?: Station | null; // null or undefined = create mode, Station = edit mode
+    station?: Station | null;
     onSave: (data: Partial<Station> & { name: string; address: string }) => Promise<boolean>;
     onClose: () => void;
 }
@@ -25,7 +25,6 @@ const StationFormModal: React.FC<StationFormModalProps> = ({ station, onSave, on
     const [isSaving, setIsSaving]       = useState(false);
     const [error, setError]             = useState('');
 
-    // Focus name input on mount
     useEffect(() => {
         const el = document.getElementById('station-form-name');
         if (el) el.focus();
@@ -69,13 +68,10 @@ const StationFormModal: React.FC<StationFormModalProps> = ({ station, onSave, on
 
     return (
         <>
-            {/* Backdrop */}
             <div
                 className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[2000]"
                 onClick={onClose}
             />
-
-            {/* Modal */}
             <div className="fixed inset-0 z-[2001] flex items-center justify-center p-4 pointer-events-none">
                 <div
                     className="pointer-events-auto w-full max-w-lg max-h-[90vh] bg-white dark:bg-slate-900 rounded-3xl overflow-hidden flex flex-col animate-scale-in"
@@ -83,7 +79,6 @@ const StationFormModal: React.FC<StationFormModalProps> = ({ station, onSave, on
                         boxShadow: '0 32px 80px rgba(0,0,0,0.30), 0 8px 24px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.10)',
                     }}
                 >
-                    {/* Header */}
                     <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-white/10 shrink-0">
                         <h2 className="text-xl font-black text-gray-900 dark:text-white">
                             {isEdit ? 'Editar Estación' : 'Nueva Estación'}
@@ -95,10 +90,7 @@ const StationFormModal: React.FC<StationFormModalProps> = ({ station, onSave, on
                             <X className="w-5 h-5" />
                         </button>
                     </div>
-
-                    {/* Form */}
                     <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
-                        {/* Name */}
                         <div>
                             <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
                                 Nombre *
@@ -112,8 +104,6 @@ const StationFormModal: React.FC<StationFormModalProps> = ({ station, onSave, on
                                 className="w-full px-4 py-3 min-h-[44px] text-sm rounded-xl bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400"
                             />
                         </div>
-
-                        {/* Address */}
                         <div>
                             <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
                                 <MapPin className="w-3 h-3 inline mr-1" />Dirección *
@@ -126,8 +116,6 @@ const StationFormModal: React.FC<StationFormModalProps> = ({ station, onSave, on
                                 className="w-full px-4 py-3 min-h-[44px] text-sm rounded-xl bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400"
                             />
                         </div>
-
-                        {/* City + Province */}
                         <div className="grid grid-cols-2 gap-3">
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
@@ -154,8 +142,6 @@ const StationFormModal: React.FC<StationFormModalProps> = ({ station, onSave, on
                                 />
                             </div>
                         </div>
-
-                        {/* Station Code + Phone */}
                         <div className="grid grid-cols-2 gap-3">
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
@@ -182,8 +168,6 @@ const StationFormModal: React.FC<StationFormModalProps> = ({ station, onSave, on
                                 />
                             </div>
                         </div>
-
-                        {/* Manager */}
                         <div>
                             <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
                                 <User className="w-3 h-3 inline mr-1" />Encargado
@@ -196,8 +180,6 @@ const StationFormModal: React.FC<StationFormModalProps> = ({ station, onSave, on
                                 className="w-full px-4 py-3 min-h-[44px] text-sm rounded-xl bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400"
                             />
                         </div>
-
-                        {/* Coordinates */}
                         <div className="grid grid-cols-2 gap-3">
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
@@ -224,8 +206,6 @@ const StationFormModal: React.FC<StationFormModalProps> = ({ station, onSave, on
                                 />
                             </div>
                         </div>
-
-                        {/* Watch Path */}
                         <div>
                             <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
                                 <FolderOpen className="w-3 h-3 inline mr-1" />Ruta de archivos (Edge Agent)
@@ -238,8 +218,6 @@ const StationFormModal: React.FC<StationFormModalProps> = ({ station, onSave, on
                                 className="w-full px-4 py-3 min-h-[44px] text-sm rounded-xl bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400 font-mono"
                             />
                         </div>
-
-                        {/* Notes */}
                         <div>
                             <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
                                 <StickyNote className="w-3 h-3 inline mr-1" />Notas
@@ -252,16 +230,12 @@ const StationFormModal: React.FC<StationFormModalProps> = ({ station, onSave, on
                                 className="w-full px-4 py-3 min-h-[44px] text-sm rounded-xl bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400 resize-none"
                             />
                         </div>
-
-                        {/* Error */}
                         {error && (
                             <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl p-3">
                                 <p className="text-xs text-red-600 dark:text-red-400 font-semibold">{error}</p>
                             </div>
                         )}
                     </form>
-
-                    {/* Footer */}
                     <div className="shrink-0 px-6 py-5 border-t border-gray-100 dark:border-white/10 flex items-center justify-end gap-3">
                         <button
                             onClick={onClose}

@@ -22,7 +22,6 @@ export const useAlerts = () => {
         return stationId ? unresolved.filter(a => a.stationId === stationId) : unresolved;
     }, [alerts]);
 
-    /** Returns the highest alert level for a station ('CRITICAL' > 'WARNING' > 'INFO' > null). */
     const getStationAlertLevel = useCallback((stationId: string): AlertLevel | null => {
         const stationAlerts = alerts.filter(a => a.stationId === stationId && !a.resolved);
         if (stationAlerts.some(a => a.level === 'CRITICAL')) return 'CRITICAL';
@@ -31,7 +30,6 @@ export const useAlerts = () => {
         return null;
     }, [alerts]);
 
-    /** Map of station_id → AlertLevel for MapBoard marker coloring. */
     const getStationAlertMap = useCallback((): Map<string, AlertLevel> => {
         const map = new Map<string, AlertLevel>();
         for (const alert of alerts) {

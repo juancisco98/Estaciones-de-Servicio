@@ -61,7 +61,6 @@ const ClosingRow: React.FC<{
                 boxShadow: '0 0 0 1px rgba(0,0,0,0.04), 0 2px 12px rgba(0,0,0,0.07), 0 6px 24px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.80)',
             }}
         >
-            {/* Row summary */}
             <button
                 className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-left"
                 onClick={() => setExpanded(v => !v)}
@@ -96,8 +95,6 @@ const ClosingRow: React.FC<{
                     {expanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
                 </div>
             </button>
-
-            {/* Expanded detail */}
             {expanded && (
                 <div className="border-t border-gray-50 dark:border-white/5 px-5 py-5 space-y-4">
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
@@ -206,7 +203,6 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({
 
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
-            {/* Header */}
             <div className="shrink-0 p-5 pb-4 bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-white/10">
                 <div className="flex items-center gap-3 mb-5">
                     <ClipboardCheck className="w-6 h-6 text-amber-500" />
@@ -279,8 +275,6 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({
                     </div>
                 </div>
             </div>
-
-            {/* Closings list */}
             <div className="flex-1 overflow-y-auto p-5 space-y-3">
                 {filtered.length === 0 ? (
                     <div className="py-24 text-center">

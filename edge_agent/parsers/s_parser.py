@@ -1,28 +1,3 @@
-"""
-Station-OS Edge Agent — SParser
-Parses S*.TXT files: shop (salon) daily totals per shift.
-
-Real format (from S290358.TXT):
-────────────────────────────────────────────────────────────────────────────────
-CAMBIO EN TURNO SALON         59950.00 TURNO  58 SALON 0 NR.BCA   0
-TARJ.DE CREDITO              394700.00 TURNO  58 SALON 0 NR.BCA   0
-VENTAS SALON                 782500.00 TURNO  58 SALON 0 NR.BCA   0
-TOTAL ENTRA                  866200.00 TURNO  58 SALON 0 NR.BCA   0
-TOTAL SALE                   865650.00 TURNO  58 SALON 0 NR.BCA   0
-────────────────────────────────────────────────────────────────────────────────
-
-Identical format to P*.TXT but uses "SALON" instead of "PLAYA" in the tail.
-KEY FIELD: "TOTAL SALE" → stored in daily_closings.shop_total.
-
-Reconciliation:
-  daily_closings.forecourt_total  (from P*.TXT)
-+ daily_closings.shop_total       (from S*.TXT)
-= declared_total
-vs SUM(sales_transactions.total_amount WHERE station + date)
-= computed_total
-
-If |declared_total - computed_total| / declared_total > 0.001 → DISCREPANCY
-"""
 from __future__ import annotations
 
 import re
@@ -30,25 +5,18 @@ import re
 from .base_parser import BaseParser, ParseResult
 
 
-# Same structure as P file but SALON instead of PLAYA
 _S_LINE_RE = re.compile(
-    r'^(.+?)\s{2,}'             # [1] label
-    r'(-?[\d,\.]+)\s+'          # [2] amount
-    r'TURNO\s+(\d+)\s+'         # [3] turno
-    r'SALON\s+(\d+)\s+'         # [4] salon number (usually 0)
-    r'(?:NR\.BCA\s+%?\d+)?\s*$'  # trailing (optional, may have %)
+    r'^(.+?)\s{2,}'
+    r'(-?[\d,\.]+)\s+'
+    r'TURNO\s+(\d+)\s+'
+    r'SALON\s+(\d+)\s+'
+    r'(?:NR\.BCA\s+%?\d+)?\s*$'
 )
 
 _TOTAL_SALE_LABEL = "TOTAL SALE"
 
 
 class SParser(BaseParser):
-    """
-    Parser for S*.TXT — shop/salon daily totals.
-    Upserts into `daily_closings` (station_id, shift_date) with shop_total.
-    Designed to merge with the PParser record (same station_id + shift_date key).
-    """
-
     def parse(self) -> ParseResult:
         result = self._make_result()
         lines = self._read_lines()
@@ -82,7 +50,7 @@ class SParser(BaseParser):
             result.lines_ok += 1
 
         if not totals:
-            result.add_error(0, "", "No valid lines found in S file — file may be empty or corrupt")
+            result.add_error(0, "", "No valid lines found in S file")
             return result
 
         shop_total = totals.get(_TOTAL_SALE_LABEL)
@@ -99,15 +67,15 @@ class SParser(BaseParser):
             return result
 
         record = {
-            "station_id":      self.station_id,
-            "shift_date":      shift_date,
-            "shop_total":      str(shop_total) if shop_total is not None else None,
-            "s_closing_ts":    self._get_file_mtime_ts(),
-            "s_file_name":     self.file_name,
-            "status":          "PENDING",
-            "turno":           turno,
+            "station_id":        self.station_id,
+            "shift_date":        shift_date,
+            "shop_total":        str(shop_total) if shop_total is not None else None,
+            "s_closing_ts":      self._get_file_mtime_ts(),
+            "s_file_name":       self.file_name,
+            "status":            "PENDING",
+            "turno":             turno,
             "s_totals_snapshot": totals,
-            "_salon":          salon,
+            "_salon":            salon,
         }
 
         result.records.append(record)

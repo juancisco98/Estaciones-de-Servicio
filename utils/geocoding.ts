@@ -4,7 +4,6 @@ export const geocodeAddress = async (address: string): Promise<{ lat: number; ln
     if (!address) return null;
 
     try {
-        // 1. Try Google Maps if API key is present
         const googleKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
         if (googleKey) {
             const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${googleKey}`);
@@ -20,7 +19,6 @@ export const geocodeAddress = async (address: string): Promise<{ lat: number; ln
             }
         }
 
-        // 2. Fallback to OpenStreetMap (Nominatim)
         const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`);
         const data = await response.json();
 

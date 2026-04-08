@@ -90,8 +90,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const unresolvedAlertCount = alerts.filter(a => !a.resolved).length;
     const criticalAlertCount   = alerts.filter(a => !a.resolved && a.level === 'CRITICAL').length;
 
-    // ── Notification actions ──────────────────────────────────────────────────
-
     const markNotificationRead = useCallback(async (id: string) => {
         setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
         await supabase.from('notifications').update({ read: true }).eq('id', id);
@@ -113,8 +111,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             .update({ resolved: true, resolved_at: new Date().toISOString() })
             .eq('id', id);
     }, []);
-
-    // ── Data loading ──────────────────────────────────────────────────────────
 
     const loadData = async () => {
         setIsLoading(true);
@@ -156,7 +152,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (stationsResult.error)  throw stationsResult.error;
             if (employeesResult.error) throw employeesResult.error;
 
-            // Log errors but don't crash on non-critical tables
             if (txResult.error)            console.error('[DataContext] sales_transactions error:', txResult.error);
             if (closingsResult.error)      console.error('[DataContext] daily_closings error:', closingsResult.error);
             if (tanksResult.error)         console.error('[DataContext] tank_levels error:', tanksResult.error);
@@ -171,7 +166,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (alertsResult.data)        setAlerts(alertsResult.data.map(dbToAlert));
             if (notificationsResult.data) setNotifications(notificationsResult.data.map(dbToNotification));
 
-            // card_payments: optional, does not block the app
             try {
                 const cpResult = await supabase.from('card_payments').select('*')
                     .gte('shift_date', dateCutoffDate)
@@ -181,7 +175,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 console.warn('[DataContext] card_payments table not available');
             }
 
-            // cash_closings: A file data
             try {
                 const ccResult = await supabase.from('cash_closings').select('*')
                     .gte('shift_date', dateCutoffDate)
@@ -191,7 +184,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 console.warn('[DataContext] cash_closings table not available');
             }
 
-            // allowed_emails: for superadmin owner management
             try {
                 const aeResult = await supabase.from('allowed_emails').select('*')
                     .order('created_at', { ascending: true });
@@ -207,12 +199,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
 
-    // ── Real-time subscriptions ───────────────────────────────────────────────
-
     useEffect(() => {
         loadData();
 
-        // Sales transactions
         const salesChannel = supabase
             .channel(RT_CHANNELS.SALES)
             .on('postgres_changes',
@@ -233,7 +222,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 }
             ).subscribe();
 
-        // Tank levels
         const tanksChannel = supabase
             .channel(RT_CHANNELS.TANKS)
             .on('postgres_changes',
@@ -252,7 +240,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 }
             ).subscribe();
 
-        // Daily closings
         const closingsChannel = supabase
             .channel(RT_CHANNELS.CLOSINGS)
             .on('postgres_changes',
@@ -273,7 +260,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 }
             ).subscribe();
 
-        // Alerts — critical ones surface immediately as toasts
         const alertsChannel = supabase
             .channel(RT_CHANNELS.ALERTS)
             .on('postgres_changes',
@@ -285,7 +271,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         return [alert, ...prev];
                     });
 
-                    // Show toast based on alert level
                     if (alert.level === 'CRITICAL') {
                         toast.error(alert.title, {
                             description: alert.message,
@@ -316,7 +301,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 }
             ).subscribe();
 
-        // Notifications
         const notificationsChannel = supabase
             .channel(RT_CHANNELS.NOTIFICATIONS)
             .on('postgres_changes',
@@ -340,7 +324,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 }
             ).subscribe();
 
-        // Card payments (C files)
         const cardPaymentsChannel = supabase
             .channel(RT_CHANNELS.CARD_PAYMENTS)
             .on('postgres_changes',
@@ -361,7 +344,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 }
             ).subscribe();
 
-        // Cash closings (A files)
         const cashClosingsChannel = supabase
             .channel(RT_CHANNELS.CASH_CLOSINGS)
             .on('postgres_changes',

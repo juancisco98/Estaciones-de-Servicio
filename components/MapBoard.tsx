@@ -8,7 +8,6 @@ import { Station, AlertLevel } from '../types';
 import { MAP_CENTER, MAP_ZOOM_DEFAULT, MAP_RESIZE_DELAY_MS } from '../constants';
 import { useAlerts } from '../hooks/useAlerts';
 
-// Fix Leaflet Default Icon — use local npm package assets (no CDN)
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
     iconRetinaUrl: markerIcon2x,
@@ -27,7 +26,6 @@ const ICON_SIZE = 36;
 const ICON_HALF = ICON_SIZE / 2;
 const EMOJI_SIZE = 18;
 
-/** Color-coded station icon based on alert level. Pulses on CRITICAL. */
 const createStationIcon = (alertLevel: AlertLevel | null, isSelected: boolean) => {
     const colors: Record<string, { bg: string; border: string; shadow: string }> = {
         CRITICAL: { bg: '#ef4444', border: '#fca5a5', shadow: 'rgba(239,68,68,0.5)' },
@@ -69,7 +67,6 @@ const MapResizer: React.FC = () => {
     return null;
 };
 
-// Always light mode for the map — user explicitly requested this
 const TILE_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
 const TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>';
 
@@ -81,7 +78,6 @@ const MapBoard: React.FC<MapBoardProps> = ({ stations, selectedStation, onStatio
 
     return (
         <>
-            {/* Pulse animation for critical markers */}
             <style>{`@keyframes ping{75%,100%{transform:scale(2);opacity:0}}`}</style>
             <MapContainer
                 center={MAP_CENTER}

@@ -62,7 +62,6 @@ const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, activeStat
 
     const stationMap = useMemo(() => new Map(stations.map(s => [s.id, s.name])), [stations]);
 
-    // Build rows ONLY from S files (daily_closings with shopTotal)
     const dayRows = useMemo(() => {
         let results: DayRow[] = dailyClosings
             .filter(c => c.shopTotal != null)

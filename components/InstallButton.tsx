@@ -28,14 +28,11 @@ const InstallButton: React.FC = () => {
     const handleInstallClick = async () => {
         if (!deferredPrompt) return;
 
-        // Show the install prompt
         deferredPrompt.prompt();
 
-        // Wait for the user to respond to the prompt
         const { outcome } = await deferredPrompt.userChoice;
         logger.log(`User response to the install prompt: ${outcome}`);
 
-        // We've used the prompt, and can't use it again, discard it
         setDeferredPrompt(null);
         setIsInstallable(false);
     };

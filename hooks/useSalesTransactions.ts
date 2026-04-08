@@ -5,17 +5,14 @@ import { useDataContext } from '../context/DataContext';
 export const useSalesTransactions = () => {
     const { salesTransactions } = useDataContext();
 
-    /** All transactions for a given station, newest first. */
     const getByStation = useCallback((stationId: string): SalesTransaction[] =>
         salesTransactions.filter(t => t.stationId === stationId),
     [salesTransactions]);
 
-    /** Transactions for a specific date (YYYY-MM-DD). */
     const getByDate = useCallback((stationId: string, date: string): SalesTransaction[] =>
         salesTransactions.filter(t => t.stationId === stationId && t.shiftDate === date),
     [salesTransactions]);
 
-    /** Transactions for a date range (inclusive). */
     const getByDateRange = useCallback((
         stationId: string,
         from: string,
@@ -28,24 +25,20 @@ export const useSalesTransactions = () => {
         ),
     [salesTransactions]);
 
-    /** Sum of total_amount for a station on a given date. */
     const getDailyRevenue = useCallback((stationId: string, date: string): number =>
         getByDate(stationId, date).reduce((sum, t) => sum + t.totalAmount, 0),
     [getByDate]);
 
-    /** Sum of quantity (liters) for FUEL products on a given date. */
     const getDailyFuelLiters = useCallback((stationId: string, date: string): number =>
         getByDate(stationId, date)
-            .filter(t => Number(t.productCode) <= 20) // fuel products have low codes
+            .filter(t => Number(t.productCode) <= 20)
             .reduce((sum, t) => sum + t.quantity, 0),
     [getByDate]);
 
-    /** Detect anomalous transactions (negative quantity). */
     const getAnomalies = useCallback((stationId: string): SalesTransaction[] =>
         salesTransactions.filter(t => t.stationId === stationId && t.quantity < 0),
     [salesTransactions]);
 
-    /** Group by product for a date range — used in analytics. */
     const getProductBreakdown = useCallback((
         stationId: string,
         from: string,

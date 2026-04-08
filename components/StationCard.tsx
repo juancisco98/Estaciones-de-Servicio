@@ -30,13 +30,10 @@ const StationCard: React.FC<StationCardProps> = ({
 
     return (
         <>
-            {/* Overlay to close on click outside */}
             <div
                 className="absolute inset-0 z-[400] lg:hidden"
                 onClick={onClose}
             />
-
-            {/* Card */}
             <div className="absolute bottom-4 left-4 right-4 lg:bottom-auto lg:top-24 lg:right-5 lg:left-auto lg:w-96 z-[500] pointer-events-auto animate-slide-up">
                 <div
                     className="bg-white/90 dark:bg-slate-900/95 backdrop-blur-2xl rounded-3xl overflow-hidden
@@ -44,8 +41,6 @@ const StationCard: React.FC<StationCardProps> = ({
                                border border-white/70 dark:border-white/10"
                     style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.18), 0 8px 24px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.80)' }}
                 >
-
-                    {/* Header */}
                     <div className="shrink-0 p-5 border-b border-gray-100/80 dark:border-white/8 bg-gray-50/50 dark:bg-white/[0.02]">
                         <div className="flex items-start justify-between gap-3">
                             <div>
@@ -69,11 +64,7 @@ const StationCard: React.FC<StationCardProps> = ({
                             </span>
                         )}
                     </div>
-
-                    {/* Body */}
                     <div className="overflow-y-auto flex-1 p-5 space-y-4">
-
-                        {/* Today's stats */}
                         <div className="grid grid-cols-2 gap-3">
                             <div className="bg-amber-50 dark:bg-amber-500/10 rounded-xl p-4">
                                 <div className="flex items-center gap-1.5 mb-1">
@@ -96,8 +87,6 @@ const StationCard: React.FC<StationCardProps> = ({
                                 <p className="text-xs text-gray-400 dark:text-slate-500">litros hoy</p>
                             </div>
                         </div>
-
-                        {/* Active alert */}
                         {topAlert && (
                             <div className={`rounded-xl p-3 ${
                                 topAlert.level === 'CRITICAL'
@@ -126,8 +115,6 @@ const StationCard: React.FC<StationCardProps> = ({
                                 <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5 line-clamp-2">{topAlert.message}</p>
                             </div>
                         )}
-
-                        {/* Employees */}
                         {employees.length > 0 && (
                             <div>
                                 <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-2">Personal</p>
@@ -148,8 +135,6 @@ const StationCard: React.FC<StationCardProps> = ({
                             </div>
                         )}
                     </div>
-
-                    {/* Footer */}
                     <div className="shrink-0 p-4 border-t border-gray-100/80 dark:border-white/8 bg-gray-50/30 dark:bg-white/[0.02]">
                         <button
                             onClick={onViewDetails}

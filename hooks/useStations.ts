@@ -14,22 +14,18 @@ export const useStations = () => {
         try {
             const isNew = !data.id;
 
-            // Get current user email for owner_email (required NOT NULL)
             let ownerEmail = data.ownerEmail;
             if (!ownerEmail) {
                 if (!isNew) {
-                    // Editing: preserve existing owner_email
                     const existing = stations.find(s => s.id === data.id);
                     ownerEmail = existing?.ownerEmail;
                 }
                 if (!ownerEmail) {
-                    // New station or no existing: use current user's email
                     const { data: sessionData } = await supabase.auth.getSession();
                     ownerEmail = sessionData.session?.user?.email ?? undefined;
                 }
             }
 
-            // Validar coordenadas
             const coords = data.coordinates;
             if (!coords || coords.length !== 2
                 || isNaN(coords[0]) || isNaN(coords[1])

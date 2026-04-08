@@ -1,16 +1,3 @@
-"""
-Station-OS Edge Agent — AParser
-Parses A*.TXT files: cash register totals (CAJA + CHEQUE) per shift.
-
-Real format (from A02040.TXT):
-────────────────────────────────────────────────────────────────────────────────
-CAJA     5454620578.54
-CHEQUE        51171.10
-────────────────────────────────────────────────────────────────────────────────
-
-Simple two-column format: LABEL (padded) + AMOUNT.
-3 files per day (one per turno closing).
-"""
 from __future__ import annotations
 
 import os
@@ -20,17 +7,12 @@ from .base_parser import BaseParser, ParseResult
 
 
 _A_LINE_RE = re.compile(
-    r'^([A-Za-z\s\.\-]+?)\s+'   # [1] label (alphabetic + spaces, non-greedy)
-    r'(-?[\d,\.]+)\s*$'         # [2] amount (decimal, can be negative)
+    r'^([A-Za-z\s\.\-]+?)\s+'
+    r'(-?[\d,\.]+)\s*$'
 )
 
 
 class AParser(BaseParser):
-    """
-    Parser for A*.TXT — cash register totals.
-    One row per file. Goes into `cash_closings` Supabase table.
-    """
-
     def parse(self) -> ParseResult:
         result = self._make_result()
         lines = self._read_lines()
@@ -44,9 +26,8 @@ class AParser(BaseParser):
 
             m = _A_LINE_RE.match(line)
             if not m:
-                # Log lines that look like data but don't match
                 if line.strip() and any(c.isdigit() for c in line):
-                    result.add_error(line_num, line, "Line does not match A format — possible VB format change")
+                    result.add_error(line_num, line, "Line does not match A format")
                 continue
 
             result.lines_parsed += 1
@@ -71,9 +52,7 @@ class AParser(BaseParser):
             result.add_error(0, "", f"Cannot extract date from filename {self.file_name!r}")
             return result
 
-        # Extract sequential turno from filename (A02040 → digits "02040" → turno after DDMM)
         name_no_ext = os.path.splitext(self.file_name)[0].upper()
-        # Extract only leading digits after prefix letter(s)
         digit_match = re.search(r'[A-Z]+(\d+)', name_no_ext)
         if digit_match:
             digits = digit_match.group(1)

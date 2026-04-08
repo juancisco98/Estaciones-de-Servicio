@@ -34,7 +34,6 @@ const NotificationIcon: React.FC<{ type: AppNotification['type'] }> = ({ type })
     return <Bell className="w-4 h-4 text-slate-500 shrink-0" />;
 };
 
-/* ── Dark-mode pill toggle ───────────────────────────────────────── */
 const ThemeToggle: React.FC = () => {
     const { theme, toggleTheme } = useTheme();
     const isDark = theme === 'dark';
@@ -49,7 +48,6 @@ const ThemeToggle: React.FC = () => {
                        focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
             style={{ boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.10), 0 1px 2px rgba(0,0,0,0.06)' }}
         >
-            {/* track bg when dark */}
             <span
                 className="absolute inset-0 rounded-full transition-opacity duration-300"
                 style={{
@@ -57,7 +55,6 @@ const ThemeToggle: React.FC = () => {
                     opacity: isDark ? 1 : 0,
                 }}
             />
-            {/* thumb */}
             <span
                 className="absolute top-[3px] w-[22px] h-[22px] rounded-full
                            bg-white dark:bg-amber-400
@@ -122,13 +119,11 @@ const Header: React.FC<HeaderProps> = ({
 
     const totalBadge = unreadCount + unresolvedAlertCount;
 
-    // Station health: compute last sync time per station
     const stationHealth = useMemo(() => {
         const now = Date.now();
         const healthMap = new Map<string, { name: string; lastSync: number; ago: string; status: 'OK' | 'WARNING' | 'CRITICAL' }>();
 
         for (const st of stations) {
-            // Find most recent data for this station across all tables
             let latest = 0;
 
             for (const tx of salesTransactions) {
@@ -160,7 +155,6 @@ const Header: React.FC<HeaderProps> = ({
         return healthMap;
     }, [stations, salesTransactions, dailyClosings]);
 
-    // Overall status: worst station determines the indicator
     const overallStatus = useMemo(() => {
         if (stationHealth.size === 0) return 'OK' as const;
         const statuses = [...stationHealth.values()].map(h => h.status);
@@ -194,7 +188,6 @@ const Header: React.FC<HeaderProps> = ({
                     boxShadow: '0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.8)',
                 }}
             >
-                {/* Left: menu + logo */}
                 <div className="flex items-center gap-2 shrink-0">
                     <button
                         onClick={onMenuClick}
@@ -217,11 +210,7 @@ const Header: React.FC<HeaderProps> = ({
                         </div>
                     </div>
                 </div>
-
-                {/* Divider */}
                 {onMapSearch && <div className="hidden sm:block w-px h-6 bg-gray-200 dark:bg-white/10 shrink-0" />}
-
-                {/* Center: search */}
                 {onMapSearch && (
                     <form onSubmit={handleSearch} className="flex-1 min-w-0 mx-1">
                         <div className="relative">
@@ -243,14 +232,8 @@ const Header: React.FC<HeaderProps> = ({
                         </div>
                     </form>
                 )}
-
-                {/* Divider */}
                 <div className="hidden sm:block w-px h-6 bg-gray-200 dark:bg-white/10 shrink-0" />
-
-                {/* Right: actions */}
                 <div className="flex items-center gap-1 shrink-0">
-
-                    {/* Refresh */}
                     <button
                         onClick={onRefresh}
                         disabled={isLoading}
@@ -261,8 +244,6 @@ const Header: React.FC<HeaderProps> = ({
                     >
                         {isLoading ? <Loader2 className="w-[18px] h-[18px] animate-spin text-amber-500" /> : <RefreshCw className="w-[18px] h-[18px]" />}
                     </button>
-
-                    {/* Station health indicator */}
                     <div className="relative" ref={healthRef}>
                         <button
                             onClick={() => setShowHealth(v => !v)}
@@ -319,13 +300,9 @@ const Header: React.FC<HeaderProps> = ({
                             </div>
                         )}
                     </div>
-
-                    {/* Theme toggle pill */}
                     <ThemeToggle />
 
                     <InstallButton />
-
-                    {/* Notifications */}
                     <div className="relative" ref={dropdownRef}>
                         <button
                             className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-xl
@@ -416,8 +393,6 @@ const Header: React.FC<HeaderProps> = ({
                             </div>
                         )}
                     </div>
-
-                    {/* Logout */}
                     <button
                         onClick={onLogout}
                         className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400

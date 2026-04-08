@@ -1,44 +1,3 @@
-"""
-Station-OS Edge Agent — Watcher
-Main entry point. Monitors D:\\SVAPP\\<station_code>\\ for new/modified .TXT files
-and orchestrates the parse → upload pipeline.
-
-Usage:
-    python edge_agent/watcher.py [--config path/to/config.yaml]
-
-Architecture:
-    watchdog FileSystemEventHandler
-        ↓ (on_created / on_modified event for *.TXT)
-    _debounce_queue (deduplication + 2s delay for VB write completion)
-        ↓
-    _process_file(file_path, station_id)
-        ↓
-    MD5 check against state.json (idempotency — skip if unchanged)
-        ↓
-    _route_to_parser(file_path) → BaseParser subclass
-        ↓
-    parser.parse() → ParseResult
-        ↓
-    uploader.upload_parse_result(result)
-        ↓
-    state.json updated with MD5 + timestamp + records_inserted
-
-File routing by prefix (case-insensitive):
-    VE*.TXT → VEParser → sales_transactions
-    C*.TXT  → CParser  → card_payments
-    T*.TXT  → TParser  → tank_levels
-    P*.TXT  → PParser  → daily_closings (forecourt_total)
-    S*.TXT  → SParser  → daily_closings (shop_total)
-
-Non-destructive guarantee:
-    The watcher ONLY reads from D:\\SVAPP. It NEVER writes to that directory.
-    state.json lives in edge_agent/ (this directory), not in D:\\SVAPP.
-
-Windows Service:
-    To run as a Windows service, use:
-        python edge_agent/watcher.py --install-service
-    (requires pywin32)
-"""
 from __future__ import annotations
 
 import argparse
@@ -67,8 +26,6 @@ except ImportError:
     from uploader import SupabaseUploader
 
 
-# ─── Constants ───────────────────────────────────────────────────────────────
-
 _AGENT_DIR = Path(__file__).parent
 _STATE_FILE = _AGENT_DIR / "state.json"
 _DEFAULT_CONFIG = _AGENT_DIR / "config.yaml"
@@ -76,14 +33,7 @@ _DEFAULT_CONFIG = _AGENT_DIR / "config.yaml"
 logger = logging.getLogger("station_os.watcher")
 
 
-# ─── State management (idempotency) ──────────────────────────────────────────
-
 class StateManager:
-    """
-    Thread-safe manager for state.json.
-    Tracks MD5 hashes of processed files to prevent duplicate uploads.
-    """
-
     def __init__(self, state_file: Path = _STATE_FILE):
         self._path = state_file
         self._lock = Lock()
@@ -100,7 +50,6 @@ class StateManager:
 
     def _save(self) -> None:
         tmp = {
-            "_comment": "Station-OS state file. Tracks processed files by MD5.",
             "_schema_version": 1,
             "processed_files": self._state,
         }
@@ -111,10 +60,7 @@ class StateManager:
             entry = self._state.get(file_path)
             if entry is None:
                 return False
-            if entry.get("md5") == md5:
-                return True
-            # File content changed — allow reprocessing
-            return False
+            return entry.get("md5") == md5
 
     def mark_processed(
         self,
@@ -133,7 +79,6 @@ class StateManager:
             self._save()
 
     def mark_failed(self, file_path: str, md5: str, error: str) -> None:
-        """Track upload failure. File will be retried on next scan — never discarded."""
         with self._lock:
             entry = self._state.get(file_path, {})
             prev_count = entry.get("fail_count", 0) if entry.get("md5") == md5 else 0
@@ -147,7 +92,6 @@ class StateManager:
 
 
 def _md5(file_path: str) -> str:
-    """Compute MD5 of a file in chunks. Never modifies the file."""
     h = hashlib.md5()
     with open(file_path, "rb") as fh:
         for chunk in iter(lambda: fh.read(65536), b""):
@@ -155,21 +99,13 @@ def _md5(file_path: str) -> str:
     return h.hexdigest()
 
 
-# ─── File routing ─────────────────────────────────────────────────────────────
-
 def _get_parser(file_path: str, station_id: str) -> BaseParser | None:
-    """
-    Route a .TXT file to the correct parser by filename prefix.
-    Returns None if the file type is not recognized.
-    """
     name = os.path.basename(file_path).upper()
     for prefix, parser_class in FILE_PREFIX_MAP.items():
         if name.startswith(prefix):
             return parser_class(station_id=station_id, file_path=file_path)
     return None
 
-
-# ─── Core processing ──────────────────────────────────────────────────────────
 
 def process_file(
     file_path: str,
@@ -178,18 +114,6 @@ def process_file(
     uploader: SupabaseUploader,
     max_file_bytes: int = 50 * 1024 * 1024,
 ) -> None:
-    """
-    Full pipeline for a single .TXT file:
-      1. Check file size (reject oversized/corrupt files)
-      2. Compute MD5 (non-destructive read)
-      3. Skip if already processed with same MD5 (idempotency)
-      4. Route to parser
-      5. Parse
-      6. Log any parse errors
-      7. Upload to Supabase
-      8. Update state.json
-    """
-    # Size guard: reject files larger than configured max
     try:
         file_size = os.path.getsize(file_path)
         if file_size > max_file_bytes:
@@ -199,7 +123,7 @@ def process_file(
             )
             return
     except OSError as exc:
-        logger.warning("Cannot stat %s: %s — will retry on next event", os.path.basename(file_path), exc)
+        logger.warning("Cannot stat %s: %s", os.path.basename(file_path), exc)
         return
 
     try:
@@ -209,12 +133,12 @@ def process_file(
         return
 
     if state.is_processed(file_path, file_md5):
-        logger.debug("Skipping %s (already processed, MD5=%s)", file_path, file_md5[:8])
+        logger.debug("Skipping %s (already processed)", file_path)
         return
 
     parser = _get_parser(file_path, station_id)
     if parser is None:
-        logger.debug("No parser for %s — skipping", os.path.basename(file_path))
+        logger.debug("No parser for %s", os.path.basename(file_path))
         return
 
     logger.info("Processing %s (station=%s)", os.path.basename(file_path), station_id[:8])
@@ -223,33 +147,27 @@ def process_file(
         result = parser.parse()
     except Exception as exc:
         logger.error("Parser crashed on %s: %s", file_path, exc, exc_info=True)
-        # NO marcar como procesado — se reintentara en el proximo scan
         return
 
-    # Log parse errors (anomalies, corrupt lines) — do not abort upload
     if result.errors:
         for err in result.errors:
             logger.warning("[%s] %s", result.file_name, err)
 
-    # Upload (retries handled internally by uploader)
     success = uploader.upload_parse_result(result)
 
     if success:
-        # Check for alerts (tank levels, negative values, reconciliation)
         try:
             from alert_checker import AlertChecker
             AlertChecker(uploader).check_alerts(result, station_id)
         except Exception as exc:
             logger.warning("Alert check failed: %s", exc)
 
-        # Solo marcar como procesado si el upload fue exitoso
         state.mark_processed(
             file_path=file_path,
             md5=file_md5,
             records_inserted=result.lines_ok,
             errors=result.errors,
         )
-        # EXTRA visible logging for T and A files (the ones we're debugging)
         prefix = result.file_name[0].upper() if result.file_name else ""
         if prefix in ("T", "A"):
             logger.info(
@@ -263,27 +181,18 @@ def process_file(
                 result.file_name, result.lines_ok, result.lines_parsed, len(result.errors),
             )
     else:
-        # Marcar fallo — se reintentará en el próximo escaneo (nunca se descarta)
         state.mark_failed(file_path, file_md5, f"Upload failed for {result.file_name}")
         prefix = result.file_name[0].upper() if result.file_name else ""
         if prefix in ("T", "A"):
             logger.error(
-                ">>> %s FILE FAIL: %s | UPLOAD FAILED — ver dead_letter para detalles",
+                ">>> %s FILE FAIL: %s | UPLOAD FAILED",
                 prefix, result.file_name,
             )
         else:
-            logger.error("FAIL %s: upload failed — se reintentará en el próximo escaneo", result.file_name)
+            logger.error("FAIL %s: upload failed", result.file_name)
 
-
-# ─── Watchdog event handler ───────────────────────────────────────────────────
 
 class TxtFileHandler(FileSystemEventHandler):
-    """
-    Handles filesystem events for a single station directory.
-    Debounces events so that VB files written in multiple chunks are fully
-    written before processing begins.
-    """
-
     def __init__(
         self,
         station_id: str,
@@ -304,7 +213,6 @@ class TxtFileHandler(FileSystemEventHandler):
         return path.upper().endswith(".TXT")
 
     def _schedule(self, file_path: str) -> None:
-        """Debounce: cancel any pending timer for this file and restart."""
         with self._lock:
             existing = self._pending.pop(file_path, None)
             if existing:
@@ -319,16 +227,12 @@ class TxtFileHandler(FileSystemEventHandler):
 
     def on_created(self, event: FileSystemEvent) -> None:
         if not event.is_directory and self._is_txt(event.src_path):
-            logger.debug("FILE CREATED: %s", event.src_path)
             self._schedule(event.src_path)
 
     def on_modified(self, event: FileSystemEvent) -> None:
         if not event.is_directory and self._is_txt(event.src_path):
-            logger.debug("FILE MODIFIED: %s", event.src_path)
             self._schedule(event.src_path)
 
-
-# ─── Bootstrap ───────────────────────────────────────────────────────────────
 
 def _setup_logging(config: dict) -> None:
     log_cfg = config.get("logging", {})
@@ -369,7 +273,6 @@ def main(config_path: Path = _DEFAULT_CONFIG, stop_event: Event | None = None) -
 
     logger.info("Station-OS Edge Agent starting...")
 
-    # Supabase credentials
     supabase_url = config["supabase"]["url"]
     service_key_env = config["supabase"]["service_key_env"]
     service_key = os.environ.get(service_key_env, "")
@@ -403,34 +306,30 @@ def main(config_path: Path = _DEFAULT_CONFIG, stop_event: Event | None = None) -
     )
     observer.schedule(handler, str(watch_root), recursive=False)
 
-    # Escaneo inicial: procesar archivos .TXT existentes que no fueron procesados
     import glob
     existing = list(set(glob.glob(str(watch_root / "*.TXT")) + glob.glob(str(watch_root / "*.txt"))))
     if existing:
-        logger.info("Escaneo inicial: %d archivos TXT encontrados en %s", len(existing), watch_root)
+        logger.info("Escaneo inicial: %d archivos", len(existing))
         for fpath in sorted(existing):
             process_file(fpath, station_id, state, uploader, max_file_bytes)
-        logger.info("Escaneo inicial completo.")
     else:
-        logger.info("No hay archivos TXT existentes en %s", watch_root)
+        logger.info("No hay archivos en %s", watch_root)
 
     observer.start()
     logger.info("Watching %s for station %s", watch_root, station_id[:8])
-    logger.info("Press Ctrl+C to stop.")
 
     try:
         poll_counter = 0
         while stop_event is None or not stop_event.is_set():
             time.sleep(1)
             poll_counter += 1
-            # Every 15 seconds, check for dashboard refresh requests
             if poll_counter >= 15:
                 poll_counter = 0
                 try:
                     pending = uploader.check_scan_request(station_id)
                     if pending:
                         req_id = pending["id"]
-                        logger.info("Scan request %s received, processing...", req_id[:8])
+                        logger.info("Scan request %s received", req_id[:8])
                         uploader.update_scan_status(req_id, "processing")
                         scan_files = list(set(
                             glob.glob(str(watch_root / "*.TXT")) +
@@ -439,7 +338,7 @@ def main(config_path: Path = _DEFAULT_CONFIG, stop_event: Event | None = None) -
                         for fpath in sorted(scan_files):
                             process_file(fpath, station_id, state, uploader, max_file_bytes)
                         uploader.update_scan_status(req_id, "completed", len(scan_files))
-                        logger.info("Scan request %s completed: %d files scanned", req_id[:8], len(scan_files))
+                        logger.info("Scan request %s completed", req_id[:8])
                 except Exception as exc:
                     logger.warning("Scan request poll error: %s", exc)
     except KeyboardInterrupt:
@@ -452,11 +351,6 @@ def main(config_path: Path = _DEFAULT_CONFIG, stop_event: Event | None = None) -
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Station-OS Edge Agent")
-    parser.add_argument(
-        "--config",
-        type=Path,
-        default=_DEFAULT_CONFIG,
-        help="Path to config.yaml",
-    )
+    parser.add_argument("--config", type=Path, default=_DEFAULT_CONFIG)
     args = parser.parse_args()
     main(config_path=args.config)

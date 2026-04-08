@@ -29,7 +29,6 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
     const [showModal, setShowModal]             = useState(false);
     const [editingStation, setEditingStation]   = useState<Station | null>(null);
 
-    // Owner management state
     const [newOwnerEmail, setNewOwnerEmail]     = useState('');
     const [addingOwner, setAddingOwner]         = useState(false);
     const [removingOwnerId, setRemovingOwnerId] = useState<string | null>(null);
@@ -39,7 +38,6 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
     const { preferences, savePreferences } = useOwnerPreferences(currentUser?.email);
     const { saveStation: updateStationOwner } = useStations();
 
-    // Check if current user is superadmin
     const isSuperadmin = allowedEmails.some(ae => ae.email === currentUser?.email && ae.isSuperadmin);
 
     const toggle = (s: NonNullable<Section>) =>
@@ -62,7 +60,6 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
 
     return (
         <div className="flex flex-col h-full bg-gray-50 dark:bg-slate-950 overflow-y-auto">
-            {/* Header */}
             <div className="px-6 py-6 border-b border-gray-100 dark:border-white/10 bg-white dark:bg-slate-900 shrink-0">
                 <div className="flex items-center gap-3">
                     <Settings className="w-6 h-6 text-amber-500" />
@@ -72,8 +69,6 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
             </div>
 
             <div className="p-5 space-y-4">
-
-                {/* ── ESTACIONES ── */}
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-white/80 dark:border-white/8 overflow-hidden"
                     style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.03), 0 4px 12px rgba(0,0,0,0.07), 0 8px 24px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.80)' }}>
                     <button
@@ -146,8 +141,6 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
                         </div>
                     )}
                 </div>
-
-                {/* ── DUEÑOS (solo superadmin) ── */}
                 {isSuperadmin && (
                     <div className="bg-white dark:bg-slate-900 rounded-2xl border border-white/80 dark:border-white/8 overflow-hidden"
                         style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.03), 0 4px 12px rgba(0,0,0,0.07), 0 8px 24px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.80)' }}>
@@ -171,7 +164,6 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
 
                         {expandedSection === 'owners' && (
                             <div className="border-t border-gray-50 dark:border-white/5">
-                                {/* Add owner input */}
                                 <div className="px-6 py-4 flex gap-2">
                                     <input
                                         type="email"
@@ -201,8 +193,6 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
                                         {addingOwner ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                                     </button>
                                 </div>
-
-                                {/* Owner list */}
                                 <div className="divide-y divide-gray-50 dark:divide-white/5">
                                     {allowedEmails.length === 0 && (
                                         <p className="px-6 py-8 text-sm text-gray-400 dark:text-slate-500 text-center">Sin dueños registrados</p>
@@ -249,8 +239,6 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
                                                         )}
                                                     </div>
                                                 </div>
-
-                                                {/* Assigned stations + assign panel */}
                                                 {assigningOwnerEmail === ae.email && (
                                                     <div className="mt-3 space-y-2">
                                                         {ownerStations.length > 0 && (
@@ -270,7 +258,6 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
                                                                 ))}
                                                             </div>
                                                         )}
-                                                        {/* Unassigned stations to pick from */}
                                                         {getUnassignedStations().length > 0 && (
                                                             <div className="space-y-1">
                                                                 <p className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Sin asignar</p>
@@ -299,13 +286,9 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
                         )}
                     </div>
                 )}
-
-                {/* ── CONOCIMIENTO DE ESTACIÓN ── */}
                 {currentUser?.role === 'ADMIN' && (
                     <KnowledgePanelSection stations={stations} isAdmin={true} />
                 )}
-
-                {/* Notifications + Thresholds */}
                 {preferences && (
                     <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-white/10 p-6 space-y-6">
                         <div className="flex items-center gap-2">
@@ -395,8 +378,6 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
                         </div>
                     </div>
                 )}
-
-                {/* System info */}
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-white/10 p-6">
                     <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-3">Sistema</p>
                     <div className="space-y-2 text-xs text-gray-500 dark:text-slate-400">
@@ -421,8 +402,6 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
                     </div>
                 </div>
             </div>
-
-            {/* Station Form Modal — Create */}
             {showModal && (
                 <StationFormModal
                     station={null}
@@ -430,8 +409,6 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
                     onClose={() => setShowModal(false)}
                 />
             )}
-
-            {/* Station Form Modal — Edit */}
             {editingStation && (
                 <StationFormModal
                     station={editingStation}
@@ -439,8 +416,6 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
                     onClose={() => setEditingStation(null)}
                 />
             )}
-
-            {/* Confirmation Modal — Remove Owner */}
             {removingOwnerId && (() => {
                 const ownerToRemove = allowedEmails.find(ae => ae.id === removingOwnerId);
                 if (!ownerToRemove) return null;
@@ -489,8 +464,6 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
                     </>
                 );
             })()}
-
-            {/* Confirmation Modal — Deactivate/Activate */}
             {deactivatingStation && (
                 <>
                     <div

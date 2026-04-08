@@ -18,8 +18,6 @@ interface KnowledgePanelSectionProps {
   isAdmin: boolean;
 }
 
-// ── Inline classification form for one unknown product code ──────────────────
-
 interface ClassifyFormProps {
   stationId: string;
   rawCode: string;
@@ -69,7 +67,6 @@ const ClassifyForm: React.FC<ClassifyFormProps> = ({ stationId, rawCode, onDone 
 
   return (
     <form onSubmit={handleSubmit} className="mt-2 p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl space-y-2">
-      {/* Canonical name */}
       <input
         type="text"
         value={canonicalName}
@@ -77,8 +74,6 @@ const ClassifyForm: React.FC<ClassifyFormProps> = ({ stationId, rawCode, onDone 
         placeholder="Nombre canónico (ej: Gas Oil Premium)"
         className="w-full text-xs px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/50"
       />
-
-      {/* Product type */}
       <div className="flex gap-1.5 flex-wrap">
         {PRODUCT_TYPES.map(pt => (
           <button
@@ -107,8 +102,6 @@ const ClassifyForm: React.FC<ClassifyFormProps> = ({ stationId, rawCode, onDone 
           </button>
         ))}
       </div>
-
-      {/* Aliases */}
       <input
         type="text"
         value={aliasesRaw}
@@ -116,8 +109,6 @@ const ClassifyForm: React.FC<ClassifyFormProps> = ({ stationId, rawCode, onDone 
         placeholder="Alias (separados por coma, opcional)"
         className="w-full text-xs px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/50"
       />
-
-      {/* Propagate globally */}
       <label className="flex items-center gap-2 cursor-pointer select-none">
         <input
           type="checkbox"
@@ -152,14 +143,12 @@ const ClassifyForm: React.FC<ClassifyFormProps> = ({ stationId, rawCode, onDone 
   );
 };
 
-// ── Main section ─────────────────────────────────────────────────────────────
-
 const KnowledgePanelSection: React.FC<KnowledgePanelSectionProps> = ({ stations, isAdmin }) => {
   const [expanded,   setExpanded]   = useState(false);
   const [knowledge,  setKnowledge]  = useState<StationKnowledge[]>([]);
   const [isLoading,  setIsLoading]  = useState(false);
   const [error,      setError]      = useState('');
-  const [openForm,   setOpenForm]   = useState<string | null>(null); // "stationId:code"
+  const [openForm,   setOpenForm]   = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -179,7 +168,6 @@ const KnowledgePanelSection: React.FC<KnowledgePanelSectionProps> = ({ stations,
   }, [expanded, knowledge.length, load]);
 
   const handleClassified = (stationId: string, code: string) => {
-    // Optimistically remove the code from the local list
     setKnowledge(prev => prev.map(k =>
       k.stationId === stationId
         ? {
@@ -201,7 +189,6 @@ const KnowledgePanelSection: React.FC<KnowledgePanelSectionProps> = ({ stations,
     (sum, k) => sum + Object.keys(k.knowledgeBlob.products).length, 0
   );
 
-  // Map stationId → station name for display
   const stationNameMap = Object.fromEntries(stations.map(s => [s.id, s.name]));
 
   return (
@@ -209,7 +196,6 @@ const KnowledgePanelSection: React.FC<KnowledgePanelSectionProps> = ({ stations,
         className="bg-white dark:bg-slate-900 rounded-2xl border border-white/80 dark:border-white/8 overflow-hidden"
         style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.80)' }}
     >
-      {/* Header */}
       <button
         onClick={() => setExpanded(v => !v)}
         className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
@@ -237,7 +223,6 @@ const KnowledgePanelSection: React.FC<KnowledgePanelSectionProps> = ({ stations,
 
       {expanded && (
         <div className="border-t border-gray-50 dark:border-white/5 p-4 space-y-4">
-          {/* Refresh button */}
           <div className="flex justify-end">
             <button
               onClick={load}
@@ -275,7 +260,6 @@ const KnowledgePanelSection: React.FC<KnowledgePanelSectionProps> = ({ stations,
 
             return (
               <div key={k.stationId} className="rounded-xl border border-gray-100 dark:border-white/10 overflow-hidden">
-                {/* Station header */}
                 <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between">
                   <p className="text-xs font-bold text-gray-700 dark:text-gray-200">{stationName}</p>
                   <div className="flex items-center gap-2 text-[10px] text-gray-400">
@@ -291,7 +275,6 @@ const KnowledgePanelSection: React.FC<KnowledgePanelSectionProps> = ({ stations,
                 </div>
 
                 <div className="p-3 space-y-2">
-                  {/* Unknown codes — classification pending */}
                   {unknownCodes.length > 0 && (
                     <div className="space-y-1.5">
                       <p className="text-[10px] font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider">
@@ -329,8 +312,6 @@ const KnowledgePanelSection: React.FC<KnowledgePanelSectionProps> = ({ stations,
                       })}
                     </div>
                   )}
-
-                  {/* Known products — read-only summary */}
                   {Object.keys(products).length > 0 && (
                     <details className="group">
                       <summary className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-600 dark:hover:text-slate-300 transition-colors">

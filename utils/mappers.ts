@@ -1,15 +1,4 @@
-/**
- * Station-OS — Mappers DB ↔ App
- *
- * Convention:
- *  dbTo*  → Supabase row (snake_case) → App interface (camelCase)
- *  *ToDb  → App interface (camelCase) → Supabase payload (snake_case)
- *
- * Rules (from CLAUDE.md):
- *  - Optional fields: ?? undefined on read, ?? null on write
- *  - Numbers: Number(row.field) to handle DB string→number coercion
- *  - Conditional payload: only include optional columns if defined (avoids schema errors)
- */
+
 
 import {
   Station,
@@ -52,8 +41,6 @@ import {
   DbCashClosingRow,
 } from '../types/dbRows';
 
-// ─── STATION ─────────────────────────────────────────────────────────────────
-
 export const dbToStation = (row: DbStationRow): Station => ({
   id:          row.id,
   name:        row.name,
@@ -91,8 +78,6 @@ export const stationToDb = (station: Station): Record<string, unknown> => {
   return payload;
 };
 
-// ─── EMPLOYEE ────────────────────────────────────────────────────────────────
-
 export const dbToEmployee = (row: DbEmployeeRow): Employee => ({
   id:         row.id,
   stationId:  row.station_id,
@@ -115,8 +100,6 @@ export const employeeToDb = (emp: Employee): Record<string, unknown> => ({
   hire_date:  emp.hireDate ?? null,
   notes:      emp.notes ?? null,
 });
-
-// ─── SALES TRANSACTION ───────────────────────────────────────────────────────
 
 export const dbToSalesTransaction = (row: DbSalesTransactionRow): SalesTransaction => ({
   id:              row.id,
@@ -155,8 +138,6 @@ export const salesTransactionToDb = (tx: SalesTransaction): Record<string, unkno
   raw_line:         tx.rawLine ?? null,
 });
 
-// ─── CARD PAYMENT ─────────────────────────────────────────────────────────────
-
 export const dbToCardPayment = (row: DbCardPaymentRow): CardPayment => ({
   id:             row.id,
   stationId:      row.station_id,
@@ -185,8 +166,6 @@ export const cardPaymentToDb = (cp: CardPayment): Record<string, unknown> => ({
   daily_closing_id: cp.dailyClosingId ?? null,
   raw_line:        cp.rawLine ?? null,
 });
-
-// ─── TANK LEVEL ───────────────────────────────────────────────────────────────
 
 export const dbToTankLevel = (row: DbTankLevelRow): TankLevel => ({
   id:             row.id,
@@ -220,8 +199,6 @@ export const tankLevelToDb = (tl: TankLevel): Record<string, unknown> => ({
   sold_amount:     tl.soldAmount ?? null,
   raw_line:        tl.rawLine ?? null,
 });
-
-// ─── DAILY CLOSING ────────────────────────────────────────────────────────────
 
 export const dbToDailyClosing = (row: DbDailyClosingRow): DailyClosing => ({
   id:                   row.id,
@@ -272,8 +249,6 @@ export const dailyClosingToDb = (dc: DailyClosing): Record<string, unknown> => {
   return payload;
 };
 
-// ─── CASH CLOSING ─────────────────────────────────────────────────────────────
-
 export const dbToCashClosing = (row: DbCashClosingRow): CashClosing => ({
   id:           row.id,
   stationId:    row.station_id,
@@ -285,8 +260,6 @@ export const dbToCashClosing = (row: DbCashClosingRow): CashClosing => ({
   aFileName:    row.a_file_name ?? undefined,
   createdAt:    row.created_at,
 });
-
-// ─── ALERT ────────────────────────────────────────────────────────────────────
 
 export const dbToAlert = (row: DbAlertRow): Alert => ({
   id:          row.id,
@@ -319,8 +292,6 @@ export const alertToDb = (alert: Alert): Record<string, unknown> => ({
   metadata:     alert.metadata ?? null,
 });
 
-// ─── NOTIFICATION ─────────────────────────────────────────────────────────────
-
 export const dbToNotification = (row: DbNotificationRow): AppNotification => ({
   id:             row.id,
   recipientEmail: row.recipient_email,
@@ -344,8 +315,6 @@ export const notificationToDb = (n: AppNotification): Record<string, unknown> =>
   created_at:      n.createdAt,
   metadata:        n.metadata ?? null,
 });
-
-// ─── STATION KNOWLEDGE ────────────────────────────────────────────────────────
 
 export const dbToStationKnowledge = (row: DbStationKnowledgeRow): StationKnowledge => {
   const blob = row.knowledge_blob ?? {} as Partial<DbStationKnowledgeRow['knowledge_blob']>;
@@ -390,10 +359,6 @@ export const dbToStationKnowledge = (row: DbStationKnowledgeRow): StationKnowled
   };
 };
 
-// ─── ALLOWED EMAIL ───────────────────────────────────────────────────────────
-
-// ─── OWNER PREFERENCES ──────────────────────────────────────────────────────
-
 export const dbToOwnerPreferences = (row: DbOwnerPreferencesRow): OwnerPreferences => ({
   id:                    row.id,
   ownerEmail:            row.owner_email,
@@ -425,8 +390,6 @@ export const ownerPreferencesToDb = (p: OwnerPreferences): Record<string, unknow
   shift_afternoon_start:   p.shiftAfternoonStart,
   shift_night_start:       p.shiftNightStart,
 });
-
-// ─── ALLOWED EMAIL ───────────────────────────────────────────────────────────
 
 export const dbToAllowedEmail = (row: DbAllowedEmailRow): AllowedEmail => ({
   id:           row.id,

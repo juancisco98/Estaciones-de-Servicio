@@ -137,7 +137,6 @@ const AlertsView: React.FC<AlertsViewProps> = ({ alerts, stations, onResolveAler
 
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
-            {/* Header */}
             <div className="shrink-0 p-5 pb-4 border-b border-gray-100 dark:border-white/10 bg-white dark:bg-slate-900">
                 <div className="flex items-center gap-3 mb-5">
                     <AlertTriangle className="w-6 h-6 text-red-500" />
@@ -155,8 +154,6 @@ const AlertsView: React.FC<AlertsViewProps> = ({ alerts, stations, onResolveAler
                         )}
                     </div>
                 </div>
-
-                {/* Filters */}
                 <div className="flex items-center gap-3 flex-wrap">
                     <StationFilter
                         stations={stations}
@@ -209,8 +206,6 @@ const AlertsView: React.FC<AlertsViewProps> = ({ alerts, stations, onResolveAler
                     </label>
                 </div>
             </div>
-
-            {/* Alert list */}
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
                 {filtered.length === 0 ? (
                     <div className="py-24 text-center">

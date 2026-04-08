@@ -15,7 +15,6 @@ export const useAnalytics = () => {
     const { getStationAlertLevel, getUnresolved } = useAlerts();
     const { getLatestPerStation, discrepancyCount, pendingCount } = useDailyClosings();
 
-    /** Per-station metrics for a given period. */
     const getStationMetrics = useCallback((
         stationId: string,
         dateFrom: string,
@@ -28,21 +27,17 @@ export const useAnalytics = () => {
             .filter(t => Number(t.productCode) <= 20)
             .reduce((sum, t) => sum + t.quantity, 0);
 
-        // Payment breakdown from card_payments (C files) — authoritative source
         const cpForStation   = getCardPaymentsByDateRange(dateFrom, dateTo, stationId);
         const cardRevenue    = cpForStation.filter(p => p.paymentType === 'CARD').reduce((sum, p) => sum + p.amount, 0);
         const accountRevenue = cpForStation.filter(p => p.paymentType === 'ACCOUNT').reduce((sum, p) => sum + p.amount, 0);
         const digitalRevenue = cpForStation.filter(p => ['MERCADOPAGO', 'MODO'].includes(p.paymentType)).reduce((sum, p) => sum + p.amount, 0);
         const cashRevenue    = Math.max(0, totalRevenue - cardRevenue - accountRevenue - digitalRevenue);
 
-        // Unique active days
         const activeDays = new Set(transactions.map(t => t.shiftDate)).size;
 
-        // Top product by revenue
         const productBreakdown = getProductBreakdown(stationId, dateFrom, dateTo);
         const topProduct = productBreakdown[0];
 
-        // Current stock + alert level
         const currentStockLiters = getTotalStock(stationId);
         const alertLevel         = getStationAlertLevel(stationId);
         const lowTankCount       = getLowTanks(stationId).length;
@@ -72,7 +67,6 @@ export const useAnalytics = () => {
         };
     }, [getByDateRange, getCardPaymentsByDateRange, getProductBreakdown, getTotalStock, getStationAlertLevel, getLowTanks, getLatestPerStation]);
 
-    /** Day-by-day time series for a station — used in sparkline/area charts. */
     const getDailyTimeSeries = useCallback((
         stationId: string,
         dateFrom: string,
@@ -81,7 +75,6 @@ export const useAnalytics = () => {
         const transactions = getByDateRange(stationId, dateFrom, dateTo);
         const cpForStation = getCardPaymentsByDateRange(dateFrom, dateTo, stationId);
 
-        // Group sales by shiftDate
         const byDay = new Map<string, typeof transactions>();
         for (const t of transactions) {
             const existing = byDay.get(t.shiftDate) ?? [];
@@ -89,7 +82,6 @@ export const useAnalytics = () => {
             byDay.set(t.shiftDate, existing);
         }
 
-        // Group card_payments by shiftDate
         const cpByDay = new Map<string, typeof cpForStation>();
         for (const p of cpForStation) {
             if (!p.shiftDate) continue;
@@ -98,7 +90,6 @@ export const useAnalytics = () => {
             cpByDay.set(p.shiftDate, existing);
         }
 
-        // Merge all dates
         const allDates = new Set([...byDay.keys(), ...cpByDay.keys()]);
 
         return Array.from(allDates)
@@ -122,7 +113,6 @@ export const useAnalytics = () => {
             .sort((a, b) => a.date.localeCompare(b.date));
     }, [getByDateRange, getCardPaymentsByDateRange]);
 
-    /** Network-wide summary for the period — used in the top KPI bar. */
     const getNetworkSummary = useCallback((
         dateFrom: string,
         dateTo: string,
@@ -143,7 +133,6 @@ export const useAnalytics = () => {
         const warningStations   = allMetrics.filter(m => m.alertLevel === 'WARNING').length;
         const activeStations    = allMetrics.filter(m => m.totalTransactions > 0).length;
 
-        // Top station by revenue
         const topStation = allMetrics.sort((a, b) => b.totalRevenue - a.totalRevenue)[0];
 
         return {
@@ -164,7 +153,6 @@ export const useAnalytics = () => {
         };
     }, [stations, getStationMetrics, discrepancyCount, pendingCount]);
 
-    /** Single-station period summary — used in StationDetailView header. */
     const getPeriodSummary = useCallback((
         stationId: string,
         dateFrom: string,

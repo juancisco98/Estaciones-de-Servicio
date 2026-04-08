@@ -1,19 +1,3 @@
-"""
-Station-OS Edge Agent — BaseParser
-Abstract base class for all .TXT file parsers.
-
-Every parser (VE, C, T, P, S) must:
-  1. Inherit from BaseParser
-  2. Implement the parse() method
-  3. Return a ParseResult dataclass
-
-Design decisions:
-  - Encoding detection tries latin-1 → cp1252 → utf-8 (VB systems in Argentina)
-  - raw_line is always stored for audit trail (non-destructive principle)
-  - Negative quantity/amount values are NOT rejected here — the anomaly_detector GCF handles alerts
-  - Partial failures: a file with some bad lines returns success=False but still includes
-    all successfully parsed records (partial ingestion is better than none)
-"""
 from __future__ import annotations
 
 import os
@@ -25,22 +9,20 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 
-# Encodings to try in order for legacy VB files from Argentina.
 _VB_ENCODINGS = ("latin-1", "cp1252", "utf-8")
 
 
 @dataclass
 class ParseResult:
-    """Result returned by every parser's parse() method."""
-    success: bool                       # False if any lines failed to parse
-    records: list[dict[str, Any]]       # Validated records ready for Supabase upsert
-    errors: list[str]                   # Human-readable error descriptions (line N: reason)
-    raw_file: str                       # Absolute path to the source .TXT file
-    file_name: str                      # Basename only (e.g. "VE20260330.TXT")
-    station_id: str                     # Supabase UUID of the station
-    file_type: str                      # "VE" | "C" | "T" | "P" | "S"
-    lines_parsed: int = 0               # Total non-empty, non-header lines attempted
-    lines_ok: int = 0                   # Lines successfully parsed
+    success: bool
+    records: list[dict[str, Any]]
+    errors: list[str]
+    raw_file: str
+    file_name: str
+    station_id: str
+    file_type: str
+    lines_parsed: int = 0
+    lines_ok: int = 0
     ingested_at: str = field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
 
     @property
@@ -53,21 +35,6 @@ class ParseResult:
 
 
 class BaseParser(ABC):
-    """
-    Abstract base class for all Station-OS file parsers.
-
-    Subclasses must implement:
-        parse() -> ParseResult
-
-    Provides:
-        _read_lines()          — encoding-safe file reader
-        _is_header(line)       — detects header/separator lines to skip
-        _parse_decimal(s)      — locale-safe Decimal parsing (comma → dot)
-        _parse_timestamp(s)    — VB-format date/time → ISO 8601
-        _parse_date(s)         — VB-format date → YYYY-MM-DD
-        _extract_shift_date()  — extract date from filename (e.g. VE20260330.TXT)
-    """
-
     def __init__(self, station_id: str, file_path: str):
         self.station_id = station_id
         self.file_path = os.path.abspath(file_path)
@@ -75,7 +42,6 @@ class BaseParser(ABC):
         self.file_type = self._infer_file_type()
 
     def _infer_file_type(self) -> str:
-        """Infer file type from filename prefix (VE, C, T, P, S)."""
         name = self.file_name.upper()
         for prefix in ("VE", "C", "T", "P", "S", "A"):
             if name.startswith(prefix):
@@ -84,17 +50,9 @@ class BaseParser(ABC):
 
     @abstractmethod
     def parse(self) -> ParseResult:
-        """Parse the file and return a ParseResult. Must not modify the source file."""
         ...
 
-    # ─── Protected helpers ───────────────────────────────────────────────────
-
     def _read_lines(self) -> list[str]:
-        """
-        Read the .TXT file lines with encoding detection.
-        Tries latin-1 → cp1252 → utf-8. Raises ValueError if none work.
-        NEVER modifies the file.
-        """
         for encoding in _VB_ENCODINGS:
             try:
                 with open(self.file_path, "r", encoding=encoding, errors="strict") as fh:
@@ -102,17 +60,10 @@ class BaseParser(ABC):
             except (UnicodeDecodeError, UnicodeError):
                 continue
         raise ValueError(
-            f"Cannot decode {self.file_name} with any of {_VB_ENCODINGS}. "
-            "File may be corrupted or use an unexpected encoding."
+            f"Cannot decode {self.file_name} with any of {_VB_ENCODINGS}."
         )
 
     def _is_header(self, line: str) -> bool:
-        """
-        Return True for lines that should be skipped:
-        - Empty or whitespace-only
-        - Separator lines (all dashes, equals, or dots)
-        - Lines starting with common VB header keywords
-        """
         stripped = line.strip()
         if not stripped:
             return True
@@ -127,22 +78,11 @@ class BaseParser(ABC):
         return any(upper.startswith(p) for p in skip_prefixes)
 
     def _parse_decimal(self, value: str) -> Decimal:
-        """
-        Parse a decimal number from VB-formatted strings.
-        Handles Argentine locale (comma as decimal separator):
-          "1.234,56" → Decimal("1234.56")
-          "1234.56"  → Decimal("1234.56")
-          "1234,56"  → Decimal("1234.56")
-        """
         s = value.strip()
-        # Argentine format: dot as thousands separator, comma as decimal
         if "," in s and "." in s:
-            # e.g. "1.234,56" → remove dots first, then replace comma
             s = s.replace(".", "").replace(",", ".")
         elif "," in s:
-            # e.g. "1234,56" — treat comma as decimal separator
             s = s.replace(",", ".")
-        # Remove any remaining whitespace or currency symbols
         s = re.sub(r'[^\d\.\-]', '', s)
         try:
             return Decimal(s)
@@ -150,15 +90,6 @@ class BaseParser(ABC):
             raise ValueError(f"Cannot parse {value!r} as Decimal: {exc}") from exc
 
     def _parse_timestamp(self, value: str) -> str:
-        """
-        Parse VB date/time strings to ISO 8601 (UTC assumed for Argentina ART = UTC-3).
-        Tries multiple VB date formats:
-          "30/03/2026 14:30:00"
-          "30-03-2026 14:30:00"
-          "2026/03/30 14:30"
-          "20260330143000"
-        Returns ISO 8601 string: "2026-03-30T14:30:00"
-        """
         s = value.strip()
         formats = [
             "%d/%m/%Y %H:%M:%S",
@@ -180,21 +111,10 @@ class BaseParser(ABC):
         raise ValueError(f"Cannot parse timestamp: {value!r}")
 
     def _parse_date(self, value: str) -> str:
-        """Parse VB date string to YYYY-MM-DD."""
         ts = self._parse_timestamp(value)
-        return ts[:10]  # "2026-03-30T14:30:00" → "2026-03-30"
+        return ts[:10]
 
     def _extract_shift_date_from_filename(self) -> str:
-        """
-        Extract a date from the filename. NEVER returns None — always produces a valid date.
-        Supports multiple VB naming conventions:
-          "VE20260330.TXT"  → "2026-03-30"  (YYYYMMDD)
-          "VE30032026.TXT"  → "2026-03-30"  (DDMMYYYY)
-          "C250374.TXT"     → "2026-03-25"  (DDMM + turno, year from file mtime)
-          "P310393.TXT"     → "2026-03-31"  (DDMM + turno, year from file mtime)
-        Fallback: uses file modification date if filename doesn't match any pattern.
-        """
-        # Try YYYYMMDD pattern in filename (8 consecutive digits)
         match = re.search(r'(\d{4})(\d{2})(\d{2})', self.file_name)
         if match:
             try:
@@ -202,7 +122,6 @@ class BaseParser(ABC):
                 return d.isoformat()
             except ValueError:
                 pass
-        # Try DDMMYYYY pattern (8 consecutive digits)
         match = re.search(r'(\d{2})(\d{2})(\d{4})', self.file_name)
         if match:
             try:
@@ -210,8 +129,6 @@ class BaseParser(ABC):
                 return d.isoformat()
             except ValueError:
                 pass
-        # Try DDMM + turno pattern (C/P/S/T files like C250374.TXT)
-        # Extract first 4 digits after prefix letters as DDMM, year from file mtime
         name_no_ext = os.path.splitext(self.file_name)[0].upper()
         digits = re.sub(r'^[A-Z]+', '', name_no_ext)
         if len(digits) >= 4:
@@ -222,7 +139,6 @@ class BaseParser(ABC):
                 return d.isoformat()
             except (ValueError, OSError):
                 pass
-        # FALLBACK: use file modification date (never fail)
         try:
             mtime = os.path.getmtime(self.file_path)
             return date.fromtimestamp(mtime).isoformat()
@@ -230,11 +146,6 @@ class BaseParser(ABC):
             return date.today().isoformat()
 
     def _get_file_mtime_ts(self) -> str:
-        """
-        Return the file's modification time as ISO timestamp with Argentina tz.
-        Uses UTC conversion to be timezone-safe regardless of system locale.
-        Example: P01041.TXT modified at 06:03 AR → "2026-04-01T06:03:00-03:00"
-        """
         from datetime import timezone, timedelta
         ar_tz = timezone(timedelta(hours=-3))
         try:
@@ -247,7 +158,6 @@ class BaseParser(ABC):
             return dt_ar.strftime("%Y-%m-%dT%H:%M:%S") + "-03:00"
 
     def _make_result(self) -> ParseResult:
-        """Create an empty ParseResult for this parser."""
         return ParseResult(
             success=True,
             records=[],

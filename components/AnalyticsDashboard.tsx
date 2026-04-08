@@ -64,7 +64,6 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             .sort((a, b) => b.totalRevenue - a.totalRevenue),
     [stations, getStationMetrics, dateFrom, dateTo, selectedStationId]);
 
-    // Time series for selected station or first with data
     const chartStationId = selectedStationId || (stationMetrics.find(m => m.totalTransactions > 0)?.stationId ?? '');
     const timeSeries     = useMemo(() =>
         chartStationId ? getDailyTimeSeries(chartStationId, dateFrom, dateTo) : [],
@@ -97,7 +96,6 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
 
     return (
         <div className="flex flex-col h-full bg-gray-50 dark:bg-slate-950 overflow-y-auto">
-            {/* Header */}
             <div className="p-6 pb-5 border-b border-gray-100 dark:border-white/10 bg-white dark:bg-slate-900 shrink-0">
                 <div className="flex items-center gap-3 mb-4">
                     <BarChart3 className="w-6 h-6 text-amber-500" />
@@ -145,7 +143,6 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             </div>
 
             <div className="p-6 space-y-6">
-                {/* Network KPIs */}
                 <div>
                     <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-3">
                         {periodLabel} — {selectedStationName}
@@ -165,8 +162,6 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                         ))}
                     </div>
                 </div>
-
-                {/* Payment breakdown */}
                 <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-white/80 dark:border-white/8"
                     style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.03), 0 4px 12px rgba(0,0,0,0.07), 0 8px 24px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.80)' }}>
                     <h3 className="text-sm font-bold text-gray-700 dark:text-slate-300 mb-4">Desglose por método de pago</h3>
@@ -184,8 +179,6 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                         ))}
                     </div>
                 </div>
-
-                {/* Payment method pie chart */}
                 {pieData.length > 0 && (
                     <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-white/80 dark:border-white/8"
                     style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.03), 0 4px 12px rgba(0,0,0,0.07), 0 8px 24px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.80)' }}>
@@ -231,8 +224,6 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                         </div>
                     </div>
                 )}
-
-                {/* Revenue bar chart — only with 3+ stations */}
                 {multiStation && barChartData.length > 0 && (
                     <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-white/80 dark:border-white/8"
                     style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.03), 0 4px 12px rgba(0,0,0,0.07), 0 8px 24px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.80)' }}>
@@ -251,8 +242,6 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                         </ResponsiveContainer>
                     </div>
                 )}
-
-                {/* Daily time series */}
                 {timeSeries.length > 0 && (
                     <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-white/80 dark:border-white/8"
                     style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.03), 0 4px 12px rgba(0,0,0,0.07), 0 8px 24px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.80)' }}>
@@ -293,8 +282,6 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                         </ResponsiveContainer>
                     </div>
                 )}
-
-                {/* Station ranking table — only with multiple stations */}
                 {multiStation && <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-white/80 dark:border-white/8"
                     style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.03), 0 4px 12px rgba(0,0,0,0.07), 0 8px 24px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.80)' }}>
                     <h3 className="text-sm font-bold text-gray-700 dark:text-slate-300 mb-4">Ranking de estaciones</h3>

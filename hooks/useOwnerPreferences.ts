@@ -21,7 +21,6 @@ export const useOwnerPreferences = (ownerEmail: string | undefined) => {
     const [preferences, setPreferences] = useState<OwnerPreferences | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Load preferences
     useEffect(() => {
         if (!ownerEmail) { setIsLoading(false); return; }
 
@@ -38,7 +37,6 @@ export const useOwnerPreferences = (ownerEmail: string | undefined) => {
             if (data) {
                 setPreferences(dbToOwnerPreferences(data));
             } else {
-                // Create default preferences for this owner
                 const newPrefs: OwnerPreferences = {
                     id: generateUUID(),
                     ownerEmail,
@@ -54,7 +52,6 @@ export const useOwnerPreferences = (ownerEmail: string | undefined) => {
         load();
     }, [ownerEmail]);
 
-    // Save preferences
     const savePreferences = useCallback(async (updated: Partial<OwnerPreferences>) => {
         if (!preferences) return;
         const merged = { ...preferences, ...updated, updatedAt: new Date().toISOString() };
