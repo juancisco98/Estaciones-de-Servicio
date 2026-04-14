@@ -2,11 +2,19 @@ from __future__ import annotations
 
 import os
 import re
+import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, date
 from decimal import Decimal, InvalidOperation
 from typing import Any
+
+
+_ID_NAMESPACE = uuid.UUID("6ba7b811-9dad-11d1-80b4-00c04fd430c8")  # uuid.NAMESPACE_URL
+
+
+def deterministic_record_id(station_id: str, file_name: str, line_num: int) -> str:
+    return str(uuid.uuid5(_ID_NAMESPACE, f"stationos://{station_id}/{file_name}/line/{line_num}"))
 
 
 _VB_ENCODINGS = ("latin-1", "cp1252", "utf-8")

@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import os
 import re
-import uuid
 from datetime import datetime
 
-from .base_parser import BaseParser, ParseResult
+from .base_parser import BaseParser, ParseResult, deterministic_record_id
 
 
 _T_LINE_RE = re.compile(
@@ -121,7 +120,7 @@ class TParser(BaseParser):
             tank_id = f"TQ{tank_num_str}"
 
             record = {
-                "id":                  str(uuid.uuid4()),
+                "id":                  deterministic_record_id(self.station_id, self.file_name, line_num),
                 "station_id":          self.station_id,
                 "file_name":           self.file_name,
                 "shift_date":          shift_date,          # ← FIX: ahora viene de la línea

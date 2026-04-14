@@ -8,6 +8,7 @@ import Sidebar, { ViewState } from './components/Sidebar';
 import AuthScreen from './components/AuthScreen';
 import Header from './components/Header';
 import BottomTabBar from './components/BottomTabBar';
+import AssistantDrawer from './components/AssistantDrawer';
 
 import { User, Station } from './types';
 import { DataProvider, useDataContext } from './context/DataContext';
@@ -506,6 +507,11 @@ const Dashboard: React.FC = () => {
           className="lg:hidden shrink-0"
         />
       </div>
+
+      <AssistantDrawer
+        activeStationId={activeStationId}
+        activeStationName={stations.find(s => s.id === activeStationId)?.name ?? null}
+      />
 
       <Toaster richColors position="top-right" />
     </div>

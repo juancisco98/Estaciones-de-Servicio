@@ -60,7 +60,12 @@ class StateManager:
             entry = self._state.get(file_path)
             if entry is None:
                 return False
-            return entry.get("md5") == md5
+            if entry.get("md5") != md5:
+                return False
+            # Entries written by mark_failed have fail_count; they must retry.
+            if "fail_count" in entry:
+                return False
+            return True
 
     def mark_processed(
         self,
@@ -113,6 +118,7 @@ def process_file(
     state: StateManager,
     uploader: SupabaseUploader,
     max_file_bytes: int = 50 * 1024 * 1024,
+    force: bool = False,
 ) -> None:
     try:
         file_size = os.path.getsize(file_path)
@@ -132,7 +138,7 @@ def process_file(
         logger.error("Cannot read %s: %s", file_path, exc)
         return
 
-    if state.is_processed(file_path, file_md5):
+    if not force and state.is_processed(file_path, file_md5):
         logger.debug("Skipping %s (already processed)", file_path)
         return
 
@@ -329,14 +335,18 @@ def main(config_path: Path = _DEFAULT_CONFIG, stop_event: Event | None = None) -
                     pending = uploader.check_scan_request(station_id)
                     if pending:
                         req_id = pending["id"]
-                        logger.info("Scan request %s received", req_id[:8])
+                        logger.info("Scan request %s received (FORCE rescan)", req_id[:8])
                         uploader.update_scan_status(req_id, "processing")
                         scan_files = list(set(
                             glob.glob(str(watch_root / "*.TXT")) +
                             glob.glob(str(watch_root / "*.txt"))
                         ))
+                        # El boton de auxilio bypassa state.json. La DB tiene
+                        # unique constraints (station_id, file_name, raw_line)
+                        # y los IDs son deterministicos, asi que reprocesar es
+                        # un UPSERT no-op seguro sin duplicados.
                         for fpath in sorted(scan_files):
-                            process_file(fpath, station_id, state, uploader, max_file_bytes)
+                            process_file(fpath, station_id, state, uploader, max_file_bytes, force=True)
                         uploader.update_scan_status(req_id, "completed", len(scan_files))
                         logger.info("Scan request %s completed", req_id[:8])
                 except Exception as exc:

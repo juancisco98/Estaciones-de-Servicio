@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import re
-import uuid
 from datetime import datetime
 
-from .base_parser import BaseParser, ParseResult
+from .base_parser import BaseParser, ParseResult, deterministic_record_id
 
 
 _VE_LINE_RE = re.compile(
@@ -95,7 +94,7 @@ class VEParser(BaseParser):
                 )
 
             record = {
-                "id":              str(uuid.uuid4()),
+                "id":              deterministic_record_id(self.station_id, self.file_name, line_num),
                 "station_id":      self.station_id,
                 "file_name":       self.file_name,
                 "transaction_ts":  transaction_ts,

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import re
-import uuid
 
-from .base_parser import BaseParser, ParseResult
+from .base_parser import BaseParser, ParseResult, deterministic_record_id
 
 
 _C_LINE_RE = re.compile(
@@ -85,7 +84,7 @@ class CParser(BaseParser):
                 )
 
             record = {
-                "id":             str(uuid.uuid4()),
+                "id":             deterministic_record_id(self.station_id, self.file_name, line_num),
                 "station_id":     self.station_id,
                 "file_name":      self.file_name,
                 "payment_ts":     payment_ts,
