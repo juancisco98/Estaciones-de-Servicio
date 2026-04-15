@@ -1,4 +1,4 @@
-# Station-OS Edge Agent — Automated Setup
+﻿# Station-OS Edge Agent — Automated Setup
 # Run this on the client's server PC to install the edge agent.
 # Only 2 questions: owner email + station name. Everything else is automatic.
 
