@@ -14,6 +14,7 @@ export interface DbStationRow {
   station_code?: string | null;
   watch_path?: string | null;
   notes?: string | null;
+  last_heartbeat?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -122,22 +123,6 @@ export interface DbCashClosingRow {
   closing_ts?: string | null;
   a_file_name?: string | null;
   created_at?: string;
-}
-
-export interface DbAlertRow {
-  id: string;
-  station_id?: string | null;
-  level: string;
-  type: string;
-  title: string;
-  message: string;
-  related_date?: string | null;
-  related_file?: string | null;
-  resolved: boolean;
-  resolved_at?: string | null;
-  resolved_by?: string | null;
-  metadata?: Record<string, unknown> | null;
-  created_at: string;
 }
 
 export interface DbStationKnowledgeRow {

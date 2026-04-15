@@ -1,7 +1,7 @@
 import React from 'react';
 import {
     Map as MapIcon, Fuel, ShoppingCart, Droplets,
-    AlertTriangle, BarChart3, Settings, LogOut, X, ClipboardCheck,
+    BarChart3, Settings, LogOut, X, ClipboardCheck,
     Gauge, Sun, Moon, CreditCard, RefreshCw, Banknote,
 } from 'lucide-react';
 import { User } from '../types';
@@ -12,7 +12,6 @@ export type ViewState =
     | 'STATIONS'
     | 'SALES'
     | 'TANKS'
-    | 'ALERTS'
     | 'PLAYA'
     | 'SHOP'
     | 'ACCOUNTS'
@@ -27,8 +26,6 @@ interface SidebarProps {
     onViewChange: (view: ViewState) => void;
     onLogout?: () => void;
     permanent?: boolean;
-    unresolvedAlertCount?: number;
-    criticalAlertCount?: number;
     discrepancyCount?: number;
     currentUser?: User | null;
     onRefresh?: () => void;
@@ -50,8 +47,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     onViewChange,
     onLogout,
     permanent = false,
-    unresolvedAlertCount = 0,
-    criticalAlertCount = 0,
     discrepancyCount = 0,
     currentUser,
     onRefresh,
@@ -64,13 +59,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         { id: 'STATIONS',       label: 'Estaciones',     icon: Gauge },
         { id: 'SALES',          label: 'Ventas',         icon: ShoppingCart },
         { id: 'TANKS',          label: 'Tanques',        icon: Droplets },
-        {
-            id: 'ALERTS',
-            label: 'Alertas',
-            icon: AlertTriangle,
-            badge: unresolvedAlertCount > 0 ? unresolvedAlertCount : undefined,
-            badgeVariant: criticalAlertCount > 0 ? 'red' : 'amber',
-        },
         { id: 'PLAYA',           label: 'Playa',          icon: Fuel },
         { id: 'SHOP',            label: 'Mini Mercado',   icon: ClipboardCheck },
         { id: 'ACCOUNTS',       label: 'Cuentas Ctes.',  icon: CreditCard },

@@ -1,13 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Search, MapPin, Gauge, Users, AlertTriangle, Power, Edit2, ChevronRight, Trash2 } from 'lucide-react';
-import { Station, Employee, Alert, User } from '../types';
-import { useAlerts } from '../hooks/useAlerts';
+import { Plus, Search, MapPin, Gauge, Users, Power, Edit2, ChevronRight, Trash2 } from 'lucide-react';
+import { Station, Employee, User } from '../types';
 import StationFormModal from './StationFormModal';
 
 interface StationsViewProps {
     stations: Station[];
     employees: Employee[];
-    alerts: Alert[];
     onSaveStation: (station: Omit<Station, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => Promise<boolean>;
     onDeactivateStation: (id: string) => Promise<boolean>;
     onDeleteStation: (id: string) => Promise<boolean>;
@@ -22,7 +20,6 @@ const StatusDot: React.FC<{ active: boolean }> = ({ active }) => (
 const StationsView: React.FC<StationsViewProps> = ({
     stations,
     employees,
-    alerts,
     onSaveStation,
     onDeactivateStation,
     onDeleteStation,
@@ -35,8 +32,6 @@ const StationsView: React.FC<StationsViewProps> = ({
     const [showModal, setShowModal] = useState(false);
     const [editingStation, setEditingStation] = useState<Station | null>(null);
     const [confirmDeactivateId, setConfirmDeactivateId] = useState<string | null>(null);
-    const { getStationAlertMap }    = useAlerts();
-    const alertMap                  = getStationAlertMap();
 
     const employeeCountByStation = useMemo(() => {
         const map = new Map<string, number>();
@@ -58,15 +53,8 @@ const StationsView: React.FC<StationsViewProps> = ({
                 (s.city ?? '').toLowerCase().includes(q)
             );
         }
-        return list.sort((a, b) => {
-            const la = alertMap.get(a.id);
-            const lb = alertMap.get(b.id);
-            const order = (l?: string) => l === 'CRITICAL' ? 0 : l === 'WARNING' ? 1 : l === 'INFO' ? 2 : 3;
-            const diff = order(la) - order(lb);
-            if (diff !== 0) return diff;
-            return a.name.localeCompare(b.name);
-        });
-    }, [stations, showInactive, search, alertMap]);
+        return list.sort((a, b) => a.name.localeCompare(b.name));
+    }, [stations, showInactive, search]);
 
     const isAdmin = currentUser?.role === 'ADMIN';
 
@@ -121,12 +109,8 @@ const StationsView: React.FC<StationsViewProps> = ({
             <div className="flex-1 overflow-y-auto p-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                     {filtered.map(station => {
-                        const alertLevel    = alertMap.get(station.id);
                         const empCount      = employeeCountByStation.get(station.id) ?? 0;
-                        const borderColor   =
-                            alertLevel === 'CRITICAL' ? 'border-red-300 dark:border-red-500/40' :
-                            alertLevel === 'WARNING'  ? 'border-orange-300 dark:border-orange-500/40' :
-                            'border-white/80 dark:border-white/8';
+                        const borderColor   = 'border-white/80 dark:border-white/8';
 
                         return (
                             <div
@@ -146,16 +130,6 @@ const StationsView: React.FC<StationsViewProps> = ({
                                             )}
                                         </div>
                                     </div>
-                                    {alertLevel && (
-                                        <div className={`flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
-                                            alertLevel === 'CRITICAL' ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400' :
-                                            alertLevel === 'WARNING'  ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400' :
-                                            'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400'
-                                        }`}>
-                                            <AlertTriangle className="w-3 h-3" />
-                                            {alertLevel}
-                                        </div>
-                                    )}
                                 </div>
 
                                 <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-slate-500">

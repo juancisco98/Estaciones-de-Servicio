@@ -4,7 +4,6 @@ import { useDataContext } from '../context/DataContext';
 import { useSalesTransactions } from './useSalesTransactions';
 import { useCardPayments } from './useCardPayments';
 import { useTankLevels } from './useTankLevels';
-import { useAlerts } from './useAlerts';
 import { useDailyClosings } from './useDailyClosings';
 
 export const useAnalytics = () => {
@@ -12,7 +11,6 @@ export const useAnalytics = () => {
     const { getByDateRange, getProductBreakdown } = useSalesTransactions();
     const { getByDateRange: getCardPaymentsByDateRange } = useCardPayments();
     const { getTotalStock, getLowTanks } = useTankLevels();
-    const { getStationAlertLevel, getUnresolved } = useAlerts();
     const { getLatestPerStation, discrepancyCount, pendingCount } = useDailyClosings();
 
     const getStationMetrics = useCallback((
@@ -39,7 +37,6 @@ export const useAnalytics = () => {
         const topProduct = productBreakdown[0];
 
         const currentStockLiters = getTotalStock(stationId);
-        const alertLevel         = getStationAlertLevel(stationId);
         const lowTankCount       = getLowTanks(stationId).length;
 
         const latestClosingMap = getLatestPerStation();
@@ -60,12 +57,11 @@ export const useAnalytics = () => {
             topProductCode: topProduct?.productCode,
             topProductName: topProduct?.productName,
             currentStockLiters,
-            alertLevel,
             lowTankCount,
             lastClosingStatus: latestClosing?.status,
             lastClosingDate:   latestClosing?.shiftDate,
         };
-    }, [getByDateRange, getCardPaymentsByDateRange, getProductBreakdown, getTotalStock, getStationAlertLevel, getLowTanks, getLatestPerStation]);
+    }, [getByDateRange, getCardPaymentsByDateRange, getProductBreakdown, getTotalStock, getLowTanks, getLatestPerStation]);
 
     const getDailyTimeSeries = useCallback((
         stationId: string,
@@ -129,8 +125,8 @@ export const useAnalytics = () => {
         const totalAccount      = allMetrics.reduce((sum, m) => sum + m.accountRevenue, 0);
         const totalDigital      = allMetrics.reduce((sum, m) => sum + m.digitalRevenue, 0);
 
-        const criticalStations  = allMetrics.filter(m => m.alertLevel === 'CRITICAL').length;
-        const warningStations   = allMetrics.filter(m => m.alertLevel === 'WARNING').length;
+        const criticalStations  = allMetrics.filter(m => m.lowTankCount > 0).length;
+        const warningStations   = 0;
         const activeStations    = allMetrics.filter(m => m.totalTransactions > 0).length;
 
         const topStation = allMetrics.sort((a, b) => b.totalRevenue - a.totalRevenue)[0];
@@ -161,7 +157,6 @@ export const useAnalytics = () => {
         const transactions = getByDateRange(stationId, dateFrom, dateTo);
         const totalRevenue = transactions.reduce((sum, t) => sum + t.totalAmount, 0);
         const activeDays   = new Set(transactions.map(t => t.shiftDate)).size;
-        const unresolvedAlerts = getUnresolved(stationId);
 
         return {
             totalTransactions:    transactions.length,
@@ -170,10 +165,8 @@ export const useAnalytics = () => {
             avgRevenuePerDay:     activeDays > 0 ? Math.round(totalRevenue / activeDays) : 0,
             avgTransactionsPerDay: activeDays > 0 ? Math.round(transactions.length / activeDays) : 0,
             activeDays,
-            unresolvedAlertCount: unresolvedAlerts.length,
-            criticalAlertCount:   unresolvedAlerts.filter(a => a.level === 'CRITICAL').length,
         };
-    }, [getByDateRange, getUnresolved]);
+    }, [getByDateRange]);
 
     return {
         getStationMetrics,

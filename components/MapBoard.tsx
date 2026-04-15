@@ -4,9 +4,18 @@ import L from 'leaflet';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
-import { Station, AlertLevel } from '../types';
+import { Station } from '../types';
 import { MAP_CENTER, MAP_ZOOM_DEFAULT, MAP_RESIZE_DELAY_MS } from '../constants';
-import { useAlerts } from '../hooks/useAlerts';
+
+type HealthStatus = 'ONLINE' | 'SLOW' | 'OFFLINE';
+
+const getStationHealth = (lastHeartbeat?: string): HealthStatus => {
+    if (!lastHeartbeat) return 'OFFLINE';
+    const ageMin = (Date.now() - new Date(lastHeartbeat).getTime()) / 60000;
+    if (ageMin < 5) return 'ONLINE';
+    if (ageMin < 30) return 'SLOW';
+    return 'OFFLINE';
+};
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -26,16 +35,14 @@ const ICON_SIZE = 36;
 const ICON_HALF = ICON_SIZE / 2;
 const EMOJI_SIZE = 18;
 
-const createStationIcon = (alertLevel: AlertLevel | null, isSelected: boolean) => {
-    const colors: Record<string, { bg: string; border: string; shadow: string }> = {
-        CRITICAL: { bg: '#ef4444', border: '#fca5a5', shadow: 'rgba(239,68,68,0.5)' },
-        WARNING:  { bg: '#f97316', border: '#fdba74', shadow: 'rgba(249,115,22,0.4)' },
-        INFO:     { bg: '#3b82f6', border: '#93c5fd', shadow: 'rgba(59,130,246,0.4)' },
-        OK:       { bg: '#f59e0b', border: '#fcd34d', shadow: 'rgba(245,158,11,0.4)' },
+const createStationIcon = (health: HealthStatus, isSelected: boolean) => {
+    const colors: Record<HealthStatus, { bg: string; border: string; shadow: string }> = {
+        OFFLINE: { bg: '#ef4444', border: '#fca5a5', shadow: 'rgba(239,68,68,0.5)' },
+        SLOW:    { bg: '#f59e0b', border: '#fcd34d', shadow: 'rgba(245,158,11,0.4)' },
+        ONLINE:  { bg: '#10b981', border: '#6ee7b7', shadow: 'rgba(16,185,129,0.4)' },
     };
-    const key = alertLevel ?? 'OK';
-    const { bg, border, shadow } = colors[key] ?? colors.OK;
-    const pulse = alertLevel === 'CRITICAL'
+    const { bg, border, shadow } = colors[health];
+    const pulse = health === 'OFFLINE'
         ? `<span style="position:absolute;inset:0;border-radius:inherit;background:${bg};opacity:0.4;animation:ping 1s cubic-bezier(0,0,0.2,1) infinite;"></span>`
         : '';
     const ring = isSelected ? `box-shadow:0 0 0 2px white,0 0 0 4px ${bg};` : `box-shadow:0 3px 10px ${shadow};`;
@@ -71,9 +78,6 @@ const TILE_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/
 const TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>';
 
 const MapBoard: React.FC<MapBoardProps> = ({ stations, selectedStation, onStationSelect, flyToCenter }) => {
-    const { getStationAlertMap } = useAlerts();
-    const alertMap = getStationAlertMap();
-
     const activeStations = stations.filter(s => s.isActive);
 
     return (
@@ -102,29 +106,23 @@ const MapBoard: React.FC<MapBoardProps> = ({ stations, selectedStation, onStatio
                 )}
 
                 {activeStations.map(station => {
-                    const alertLevel  = alertMap.get(station.id) ?? null;
-                    const isSelected  = selectedStation?.id === station.id;
+                    const health = getStationHealth(station.lastHeartbeat);
+                    const isSelected = selectedStation?.id === station.id;
+                    const healthColor = health === 'ONLINE' ? '#10b981' : health === 'SLOW' ? '#f59e0b' : '#ef4444';
                     return (
                         <Marker
                             key={station.id}
                             position={station.coordinates}
-                            icon={createStationIcon(alertLevel, isSelected)}
+                            icon={createStationIcon(health, isSelected)}
                             eventHandlers={{ click: () => onStationSelect(station) }}
                         >
                             <Popup>
                                 <div style={{ padding: '8px 4px', minWidth: '160px' }}>
                                     <p style={{ fontWeight: 700, fontSize: '15px', margin: '0 0 4px', color: '#111' }}>{station.name}</p>
                                     <p style={{ fontSize: '13px', color: '#6b7280', margin: '0 0 6px' }}>{station.address}</p>
-                                    {alertLevel && (
-                                        <p style={{
-                                            fontSize: '13px',
-                                            fontWeight: 600,
-                                            margin: 0,
-                                            color: alertLevel === 'CRITICAL' ? '#ef4444' : alertLevel === 'WARNING' ? '#f97316' : '#3b82f6',
-                                        }}>
-                                            ● {alertLevel}
-                                        </p>
-                                    )}
+                                    <p style={{ fontSize: '13px', fontWeight: 600, margin: 0, color: healthColor }}>
+                                        ● Agente {health}
+                                    </p>
                                     {station.stationCode && (
                                         <p style={{ fontSize: '10px', color: '#9ca3af', margin: '2px 0 0' }}>{station.stationCode}</p>
                                     )}

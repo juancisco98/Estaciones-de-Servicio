@@ -42,22 +42,6 @@ export const PAYMENT_METHOD_COLORS: Record<string, string> = {
   MERCADOPAGO: 'sky',
 };
 
-// Alert levels
-export const ALERT_LEVELS = ['CRITICAL', 'WARNING', 'INFO'] as const;
-export type AlertLevelType = typeof ALERT_LEVELS[number];
-
-export const ALERT_LEVEL_LABELS: Record<string, string> = {
-  CRITICAL: 'Crítica',
-  WARNING:  'Advertencia',
-  INFO:     'Informativa',
-};
-
-export const ALERT_LEVEL_COLORS: Record<string, string> = {
-  CRITICAL: 'red',
-  WARNING:  'orange',
-  INFO:     'blue',
-};
-
 // Closing status
 export const CLOSING_STATUS_LABELS: Record<string, string> = {
   PENDING:     'Pendiente',
@@ -112,6 +96,6 @@ export const RT_CHANNELS = {
   CLOSINGS:      'daily_closings_realtime',
   CARD_PAYMENTS: 'card_payments_realtime',
   CASH_CLOSINGS: 'cash_closings_realtime',
-  ALERTS:        'alerts_realtime',
+  STATIONS:      'stations_realtime',
   NOTIFICATIONS: 'notifications_realtime',
 } as const;

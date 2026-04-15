@@ -36,6 +36,7 @@ export interface Station {
   stationCode?: string;  // e.g. "EST_001"
   watchPath?: string;    // e.g. "C:\SVAPP"
   notes?: string;
+  lastHeartbeat?: string;  // ISO timestamp of last edge agent heartbeat
   createdAt?: string;
   updatedAt?: string;
 }
@@ -178,37 +179,6 @@ export interface OwnerPreferences {
   updatedAt?: string;
 }
 
-// ── ALERTS ──
-
-export type AlertLevel = 'CRITICAL' | 'WARNING' | 'INFO';
-
-export type AlertType =
-  | 'CASH_DISCREPANCY'
-  | 'NEGATIVE_VALUE'
-  | 'MISSING_FILE'
-  | 'LOW_TANK_LEVEL'
-  | 'CRITICAL_TANK_LEVEL'
-  | 'RECONCILIATION_FAIL'
-  | 'UNKNOWN_PRODUCT'
-  | 'VOLUME_ANOMALY'
-  | 'MISSING_TRANSACTIONS';
-
-export interface Alert {
-  id: string;
-  stationId?: string;
-  level: AlertLevel;
-  type: AlertType;
-  title: string;
-  message: string;
-  relatedDate?: string;
-  relatedFile?: string;
-  resolved: boolean;
-  resolvedAt?: string;
-  resolvedBy?: string;
-  metadata?: Record<string, unknown>;
-  createdAt: string;
-}
-
 // ── NOTIFICATIONS ──
 
 export type NotificationType =
@@ -302,7 +272,6 @@ export interface StationMetrics {
   topProductCode?: string;
   topProductName?: string;
   currentStockLiters: number;
-  alertLevel: AlertLevel | null;
   lowTankCount: number;
   lastClosingStatus?: ClosingStatus;
   lastClosingDate?: string;
@@ -334,6 +303,4 @@ export interface PeriodSummary {
   avgRevenuePerDay: number;
   avgTransactionsPerDay: number;
   activeDays: number;
-  unresolvedAlertCount: number;
-  criticalAlertCount: number;
 }

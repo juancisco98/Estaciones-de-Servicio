@@ -1,14 +1,12 @@
 import React from 'react';
-import { X, MapPin, Fuel, AlertTriangle, ShoppingCart, ChevronRight, User } from 'lucide-react';
-import { Station, Employee, SalesTransaction, Alert } from '../types';
-import { ALERT_LEVEL_COLORS, ALERT_LEVEL_LABELS } from '../constants';
+import { X, MapPin, Fuel, ShoppingCart, ChevronRight, User } from 'lucide-react';
+import { Station, Employee, SalesTransaction } from '../types';
 import { getArgentinaToday } from '../utils/dateUtils';
 
 interface StationCardProps {
     station: Station;
     employees: Employee[];
     salesTransactions: SalesTransaction[];
-    alerts: Alert[];
     onClose: () => void;
     onViewDetails: () => void;
 }
@@ -17,7 +15,6 @@ const StationCard: React.FC<StationCardProps> = ({
     station,
     employees,
     salesTransactions,
-    alerts,
     onClose,
     onViewDetails,
 }) => {
@@ -25,8 +22,6 @@ const StationCard: React.FC<StationCardProps> = ({
     const todayTx      = salesTransactions.filter(t => t.shiftDate === today);
     const todayRevenue = todayTx.reduce((s, t) => s + t.totalAmount, 0);
     const todayLiters  = todayTx.filter(t => Number(t.productCode) <= 20).reduce((s, t) => s + t.quantity, 0);
-    const criticals    = alerts.filter(a => a.level === 'CRITICAL');
-    const topAlert     = criticals[0] ?? alerts[0];
 
     return (
         <>
@@ -87,34 +82,6 @@ const StationCard: React.FC<StationCardProps> = ({
                                 <p className="text-xs text-gray-400 dark:text-slate-500">litros hoy</p>
                             </div>
                         </div>
-                        {topAlert && (
-                            <div className={`rounded-xl p-3 ${
-                                topAlert.level === 'CRITICAL'
-                                    ? 'bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20'
-                                    : topAlert.level === 'WARNING'
-                                    ? 'bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20'
-                                    : 'bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20'
-                            }`}>
-                                <div className="flex items-center gap-2 mb-1">
-                                    <AlertTriangle className={`w-3.5 h-3.5 ${
-                                        topAlert.level === 'CRITICAL' ? 'text-red-500' :
-                                        topAlert.level === 'WARNING'  ? 'text-orange-500' : 'text-blue-500'
-                                    }`} />
-                                    <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full ${
-                                        topAlert.level === 'CRITICAL' ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400' :
-                                        topAlert.level === 'WARNING'  ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400' :
-                                        'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400'
-                                    }`}>
-                                        {ALERT_LEVEL_LABELS[topAlert.level]}
-                                    </span>
-                                    {alerts.length > 1 && (
-                                        <span className="text-[10px] text-gray-400 dark:text-slate-500">+{alerts.length - 1} más</span>
-                                    )}
-                                </div>
-                                <p className="text-xs font-semibold text-gray-800 dark:text-white">{topAlert.title}</p>
-                                <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5 line-clamp-2">{topAlert.message}</p>
-                            </div>
-                        )}
                         {employees.length > 0 && (
                             <div>
                                 <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-2">Personal</p>

@@ -5,14 +5,11 @@
  * every file batch insert. Routes to the appropriate Google Cloud Functions:
  *
  *   P / S files  →  reconciler GCF        (compare declared vs transactional totals)
- *   VE / C files →  anomaly_detector GCF  (negative values, unknown products, volume)
- *   T files      →  anomaly_detector GCF  (low / critical tank levels)
  *
- * Both GCF calls are fire-and-forget: ingestion is never blocked by cloud logic.
+ * GCF calls are fire-and-forget: ingestion is never blocked by cloud logic.
  *
  * Environment variables (set in Supabase dashboard → Edge Functions → Secrets):
  *   RECONCILER_URL        — GCF URL for the reconciler function
- *   ANOMALY_DETECTOR_URL  — GCF URL for the anomaly_detector function
  *   GCF_AUTH_TOKEN        — optional Bearer token if GCFs require authentication
  *
  * Deploy:
@@ -22,7 +19,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
 const RECONCILER_URL       = Deno.env.get('RECONCILER_URL') ?? '';
-const ANOMALY_DETECTOR_URL = Deno.env.get('ANOMALY_DETECTOR_URL') ?? '';
 const GCF_AUTH_TOKEN       = Deno.env.get('GCF_AUTH_TOKEN') ?? '';
 
 const gcfHeaders: Record<string, string> = {
@@ -93,16 +89,11 @@ serve(async (req: Request) => {
 
   const gcfPayload = { station_id, shift_date };
 
-  // Determine which GCFs to call based on action or file_type
-  const resolvedAction = action ?? (file_type ? 'detect' : 'reconcile');
+  // Only P/S files trigger reconciliation. Other file types are ingested without GCF calls.
+  const resolvedAction = action ?? (file_type ? 'skip' : 'reconcile');
 
   if (resolvedAction === 'reconcile') {
-    // P or S file ingested — run reconciliation (also run anomaly detection for VE/C context)
     await callGCF(RECONCILER_URL, gcfPayload);
-  } else {
-    // VE, C, or T file ingested — run anomaly detection
-    const ft = (file_type ?? 'VE').toUpperCase();
-    await callGCF(ANOMALY_DETECTOR_URL, { ...gcfPayload, file_type: ft });
   }
 
   return new Response(

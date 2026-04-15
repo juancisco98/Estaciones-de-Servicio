@@ -226,7 +226,6 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Copy-Item "$scriptDir\*.py" $INSTALL_DIR -Force
 Copy-Item "$scriptDir\parsers" "$INSTALL_DIR\parsers" -Recurse -Force
 Copy-Item "$scriptDir\requirements.txt" $INSTALL_DIR -Force
-Copy-Item "$scriptDir\install.bat" $INSTALL_DIR -Force
 if (Test-Path "$scriptDir\DIAGNOSTICO.bat") { Copy-Item "$scriptDir\DIAGNOSTICO.bat" $INSTALL_DIR -Force }
 
 Write-Host "  OK: Archivos copiados a $INSTALL_DIR" -ForegroundColor Green
@@ -270,20 +269,16 @@ station_id: "$StationUUID"
 reconciliation:
   cash_variance_tolerance: 0.001
 
-alerts:
-  min_tank_liters: 800
-  critical_tank_liters: 300
-
 logging:
   level: "INFO"
-  log_file: 'logs\edge_agent.log'
+  log_file: 'C:\StationOS\logs\edge_agent.log'
   max_bytes: 10485760
   backup_count: 5
 
 retry:
   attempts: 3
   wait_seconds: 5
-  dead_letter_path: 'logs\dead_letter\'
+  dead_letter_path: 'C:\StationOS\logs\dead_letter\'
 "@
 
 Set-Content -Path "$INSTALL_DIR\config.yaml" -Value $configContent
@@ -363,19 +358,54 @@ try {
 
 # 6f. Configurar arranque automatico y recuperacion ante fallos
 sc.exe config StationOSEdgeAgent start= auto 2>$null | Out-Null
-sc.exe failure StationOSEdgeAgent reset= 3600 actions= restart/5000/restart/10000/restart/30000 2>$null | Out-Null
+sc.exe failure StationOSEdgeAgent reset= 0 actions= restart/5000/restart/5000/restart/5000 2>$null | Out-Null
+sc.exe failureflag StationOSEdgeAgent 1 2>$null | Out-Null
 
 # 6g. Iniciar el servicio
 Write-Host "  Iniciando servicio..." -ForegroundColor Gray
 sc.exe start StationOSEdgeAgent 2>$null | Out-Null
 Start-Sleep -Seconds 4
 
-# 6h. Verificar que quedo corriendo
+# 6h. Verificar que quedo corriendo Y que el watcher esta vivo (heartbeat real)
 $svcState = sc.exe query StationOSEdgeAgent 2>&1 | Select-String "STATE"
-if ($svcState -match "RUNNING") {
-    Write-Host "  OK: Servicio corriendo" -ForegroundColor Green
+$serviceRunning = $svcState -match "RUNNING"
+$heartbeatOk = $false
+
+if ($serviceRunning) {
+    Write-Host "  Servicio en estado RUNNING. Esperando heartbeat real (max 90s)..." -ForegroundColor Gray
+    # El watcher escribe stations.last_heartbeat al arrancar y cada 60s.
+    # Si vemos un heartbeat reciente (< 120s) entonces el thread del watcher
+    # esta vivo de verdad — no es un falso positivo del SCM.
+    for ($i = 0; $i -lt 9; $i++) {
+        Start-Sleep -Seconds 10
+        try {
+            $stationCheck = Invoke-RestMethod -Uri "$SUPABASE_URL/rest/v1/stations?id=eq.$StationUUID&select=last_heartbeat" `
+                -Method GET -Headers $AUTH_HEADERS -TimeoutSec 5
+            if ($stationCheck -and $stationCheck.Count -gt 0 -and $stationCheck[0].last_heartbeat) {
+                $hbTime = [datetime]::Parse($stationCheck[0].last_heartbeat).ToUniversalTime()
+                $ageSec = ([datetime]::UtcNow - $hbTime).TotalSeconds
+                if ($ageSec -lt 120) {
+                    $heartbeatOk = $true
+                    Write-Host "  OK: Heartbeat verificado ($([math]::Round($ageSec))s atras) — watcher vivo" -ForegroundColor Green
+                    break
+                }
+            }
+        } catch {
+            # Reintentar hasta agotar los 9 intentos
+        }
+        Write-Host "    ...intento $($i+1)/9 sin heartbeat aun" -ForegroundColor DarkGray
+    }
+}
+
+if ($serviceRunning -and $heartbeatOk) {
+    Write-Host "  OK: Servicio corriendo y procesando" -ForegroundColor Green
 } else {
-    Write-Host "  WARN: El servicio no arranco automaticamente." -ForegroundColor Yellow
+    if ($serviceRunning -and -not $heartbeatOk) {
+        Write-Host "  WARN: Servicio en RUNNING pero NO escribe heartbeat — el watcher puede estar caido." -ForegroundColor Yellow
+        Write-Host "  Revisa C:\StationOS\logs\edge_agent.log para ver el error real." -ForegroundColor Yellow
+    } else {
+        Write-Host "  WARN: El servicio no arranco automaticamente." -ForegroundColor Yellow
+    }
     # Mostrar el error real del Event Log
     $evtError = Get-EventLog -LogName Application -Source "StationOSEdgeAgent" -Newest 3 -ErrorAction SilentlyContinue
     if (-not $evtError) {
@@ -410,7 +440,7 @@ main(config_path=Path('config.yaml'), stop_event=stop)
 
 # 6i. Crear tarea programada como red de seguridad (se crea SIEMPRE, no solo si el servicio falla)
 Write-Host "  Configurando escaneo de respaldo (06:15, 14:15, 22:15)..." -ForegroundColor Gray
-$taskAction = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c cd /d C:\StationOS && python -c `"import sys; sys.path.insert(0,'.'); from watcher import main; from pathlib import Path; from threading import Event; import threading; stop=Event(); threading.Timer(180,stop.set).start(); main(config_path=Path('config.yaml'),stop_event=stop)`"" -WorkingDirectory "C:\StationOS"
+$taskAction = New-ScheduledTaskAction -Execute "python.exe" -Argument "scheduled_scan.py" -WorkingDirectory "C:\StationOS"
 $taskTriggers = @(
     New-ScheduledTaskTrigger -Daily -At "06:15"
     New-ScheduledTaskTrigger -Daily -At "14:15"

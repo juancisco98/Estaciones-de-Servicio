@@ -15,7 +15,6 @@ Responsibility:
     → SET daily_closings.status = 'RECONCILED', reconciliation_ok = TRUE
   Else:
     → SET daily_closings.status = 'DISCREPANCY', reconciliation_ok = FALSE
-    → INSERT into alerts (level='CRITICAL', type='RECONCILIATION_FAIL')
 
 Deploy:
   gcloud functions deploy reconcile \
@@ -27,7 +26,6 @@ from __future__ import annotations
 
 import logging
 import os
-import uuid
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -74,38 +72,6 @@ def _patch(table: str, filter_params: dict, payload: dict) -> None:
         timeout=15.0,
     )
     resp.raise_for_status()
-
-
-def _insert_alert_idempotent(
-    station_id: str, shift_date: str, alert_type: str, alert: dict
-) -> None:
-    """
-    Insert alert only if one of the same type/station/date does not already exist
-    (unresolved). Prevents duplicate CRITICAL alerts on repeated reconciliation runs.
-    """
-    existing = _get("alerts", {
-        "station_id":   f"eq.{station_id}",
-        "type":         f"eq.{alert_type}",
-        "related_date": f"eq.{shift_date}",
-        "resolved":     "eq.false",
-        "select":       "id",
-        "limit":        "1",
-    })
-    if existing:
-        logger.info(
-            "Alert %s already exists for station=%s date=%s — skipping",
-            alert_type, station_id, shift_date,
-        )
-        return
-
-    resp = httpx.post(_rest("alerts"), headers=_headers(), json=alert, timeout=15.0)
-    if not resp.is_success:
-        logger.error(
-            "Failed to insert alert %s for station=%s: %s",
-            alert_type, station_id, resp.text[:500],
-        )
-    else:
-        logger.info("Alert %s inserted for station=%s date=%s", alert_type, station_id, shift_date)
 
 
 # ── Cloud Function entry point ────────────────────────────────────────────────
@@ -216,40 +182,6 @@ def reconcile(request):
             "daily_closing %s updated: status=%s diff=%.2f",
             closing_id, new_status, diff,
         )
-
-        # ── Step 5: insert CRITICAL alert if discrepancy ──────────────────────
-        if is_discrepancy:
-            pct = (
-                float(abs(diff) / declared_total * 100)
-                if declared_total > 0
-                else 100.0
-            )
-            _insert_alert_idempotent(
-                station_id, shift_date, "RECONCILIATION_FAIL",
-                {
-                    "id":           str(uuid.uuid4()),
-                    "station_id":   station_id,
-                    "level":        "CRITICAL",
-                    "type":         "RECONCILIATION_FAIL",
-                    "title":        "Discrepancia de Reconciliación",
-                    "message": (
-                        f"Diferencia de ${abs(diff):.2f} ({pct:.2f}%) entre totales "
-                        f"declarados (${declared_total:.2f}) y suma de transacciones "
-                        f"(${tx_total:.2f}) para el turno del {shift_date}."
-                    ),
-                    "related_date": shift_date,
-                    "resolved":     False,
-                    "metadata": {
-                        "daily_closing_id": closing_id,
-                        "declared_total":   str(declared_total),
-                        "tx_total":         str(tx_total),
-                        "diff":             str(diff),
-                        "diff_pct":         round(pct, 4),
-                        "forecourt_total":  str(forecourt_total),
-                        "shop_total":       str(shop_total),
-                    },
-                },
-            )
 
         logger.info(
             "Reconciliation done: station=%s date=%s status=%s",

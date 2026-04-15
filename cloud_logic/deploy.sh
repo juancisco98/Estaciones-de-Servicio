@@ -43,12 +43,10 @@ echo "Station-OS: Deploying Cloud Functions to ${GCP_PROJECT_ID} (${REGION})"
 echo "============================================================"
 
 deploy_fn reconcile        reconciler        reconcile
-deploy_fn detect_anomalies anomaly_detector  detect_anomalies
 deploy_fn update_knowledge knowledge_updater update_knowledge
 
 echo ""
 echo "All functions deployed successfully."
 echo "Set the GCF URLs as Supabase secrets:"
 echo "  supabase secrets set RECONCILER_URL=https://${REGION}-${GCP_PROJECT_ID}.cloudfunctions.net/reconcile"
-echo "  supabase secrets set ANOMALY_DETECTOR_URL=https://${REGION}-${GCP_PROJECT_ID}.cloudfunctions.net/detect_anomalies"
 echo "  supabase secrets set GCF_AUTH_TOKEN=<your-shared-secret>"

@@ -47,10 +47,7 @@ The system maintains a `station_knowledge` table (JSONB per station) to:
 
 1. **Isolation:** Each station's data is processed independently to prevent cross-contamination.
 2. **Collective Intelligence:** Errors detected at Station A (e.g., a specific VB rounding bug) are uploaded to the Global Brain so Station B can automatically resolve them.
-3. **Alert Priority:**
-   - **Level 1 (Critical):** Cash discrepancy > 1% or unexplained stock drop.
-   - **Level 2 (Warning):** Low tank levels or failed transaction reconciliations.
-   - **Level 3 (Info):** Daily sales summaries and trend reports for the owner.
+3. **Agent health:** Cada edge agent escribe `stations.last_heartbeat` cada 60s. El dashboard distingue "agente vivo" (< 5 min) de "lento" (< 30 min) y "offline" (> 30 min o NULL). Decisión explícita: los dueños NO quieren alertas — la señal única es el heartbeat + el estado de reconciliación en `daily_closings`.
 
 ---
 
@@ -123,6 +120,7 @@ React (App.tsx)                 ← polls hasta completed → toast + refreshDat
 | `edge_agent/parsers/t_parser.py` | Parser T*.TXT — tanques dinámicos TQ1-TQ99, año 2/4 dígitos |
 | `edge_agent/parsers/c_parser.py` | Parser C*.TXT — cuentas corrientes y tarjetas, detecta líneas corruptas VB |
 | `edge_agent/parsers/a_parser.py` | Parser A*.TXT — caja (efectivo + cheques) por turno |
+| `edge_agent/scheduled_scan.py` | One-shot scan invocado por la tarea programada (06:15, 14:15, 22:15) |
 | `edge_agent/config.yaml` | supabase_url, watch_path, station_id, max_file_size |
 | `edge_agent/setup.ps1` | Instalador automático: para servicio → copia → limpia cache → configura → arranca |
 | `context/DataContext.tsx` | Estado global React + real-time subscriptions |
@@ -145,7 +143,7 @@ React (App.tsx)                 ← polls hasta completed → toast + refreshDat
 | Tabla | Propósito |
 |---|---|
 | `allowed_emails` | Whitelist de admins (sin cambios) |
-| `stations` | 60 estaciones de servicio |
+| `stations` | 60 estaciones de servicio. Columna `last_heartbeat` (TIMESTAMPTZ) actualizada por el edge agent cada 60s — fuente de verdad para el indicador de salud |
 | `employees` | Operadores por estación |
 | `operator_auth` | auth.uid() → employee_id + station_id |
 | `sales_transactions` | Cada línea de VE*.TXT — incluye `turno` y `area_code` (1=playa, 0=salon) |
@@ -154,7 +152,6 @@ React (App.tsx)                 ← polls hasta completed → toast + refreshDat
 | `daily_closings` | Totales P+S por turno. Columnas separadas P/S: `p_closing_ts`, `s_closing_ts`, `p_totals_snapshot`, `s_totals_snapshot`. UNIQUE: `(station_id, shift_date, turno)` |
 | `cash_closings` | Totales A (efectivo + cheques) por turno. UNIQUE: `(station_id, shift_date, turno)` |
 | `scan_requests` | Pedidos de refresh desde dashboard. Edge agent polls cada 15s |
-| `alerts` | Alertas CRITICAL/WARNING/INFO generadas |
 | `station_knowledge` | JSONB de aprendizaje por estación |
 | `notifications` | Notificaciones UI (sin cambios) |
 
@@ -275,8 +272,9 @@ className="... overflow-y-auto"               // body
 - **NO muestran transacciones VE individuales.** Los productos VE solo se ven en Historial de Ventas.
 
 ### Indicador de salud de estación — Header
-- Calcula la última sincronización por estación usando `max(transactionTs, pClosingTs, sClosingTs, createdAt)`.
-- Verde (ONLINE): < 12 horas. Ámbar (LENTO): 12-24 horas. Rojo (OFFLINE): > 24 horas o sin datos.
+- Usa `stations.last_heartbeat` (actualizado cada 60s por el edge agent) como única fuente de verdad.
+- Verde (ONLINE): < 5 min. Ámbar (LENTO): 5-30 min. Rojo (OFFLINE): > 30 min o NULL.
+- Subscripción realtime a UPDATE de `stations` → el semáforo se actualiza en vivo sin refrescar.
 - Click en el icono Activity muestra dropdown con estado por estación.
 
 ---
@@ -316,9 +314,16 @@ Cada vez que se detecte un error de parsing o reconciliación que se repita 3+ v
 - El reconciler se dispara cuando llega un archivo P o S. Si el archivo VE del mismo turno aún no fue procesado, `SUM(total_amount)` será 0 → falso DISCREPANCY. Solución: el reconciler retorna `"waiting_for_files"` si `forecourt_total` Y `shop_total` son ambos NULL, y el uploader re-dispara la reconciliación también al procesar archivos VE tardíos.
 - Tolerancia de 0.1% (0.001), NO 1% — documentado en § 11. Los sistemas de facturación argentinos tienen redondeos de centavos que generarían falsos positivos con tolerancias más bajas.
 
-#### Anomaly Detector — Cap de alertas
-- `MAX_ALERTS_PER_BATCH = 5` evita que un archivo VE corrupto con 500 líneas negativas genere 500 alertas CRITICAL en segundos, colapsando la UI. Las primeras 5 son suficientes para notificar al operador.
-- La idempotencia de alertas (`_insert_alert_idempotent`) verifica por `(station_id, type, related_date, resolved=false)`. Si se re-procesa el mismo archivo, no duplica alertas.
+#### Edge agent heartbeat (2026-04-15)
+- `uploader.send_heartbeat(station_id)` hace PATCH a `stations.last_heartbeat` cada 60s desde el loop principal de `watcher.py` y también al final de `scheduled_scan.py`.
+- El service.py ahora verifica cada 30s que el thread del watcher sigue vivo y lo relanza si murió silenciosamente (antes solo reiniciaba si lanzaba excepción).
+- `sc.exe failure` configurado con `reset= 0 actions= restart/5000/restart/5000/restart/5000` + `failureflag 1` para que el SCM reinicie el servicio ante cualquier crash, incluso los no limpios.
+- La tarea programada 06:15/14:15/22:15 ahora invoca `scheduled_scan.py` (script dedicado con timeout de 600s) en vez de un one-liner inline de 180s — más fácil de debuggear y con logs propios.
+
+#### Alertas eliminadas (2026-04-15)
+- Los dueños pidieron eliminar la sección Alertas. Se borró: frontend (AlertsView, useAlerts, DataContext), backend (`cloud_logic/anomaly_detector`, `alert_checker.py`, `_insert_alert_idempotent` del reconciler, `_insert_normalization_alert` del knowledge_updater), tabla `alerts` (DROP CASCADE) y tipos TS (`Alert`, `AlertLevel`, `AlertType`).
+- El status `DISCREPANCY` de `daily_closings` sigue siendo la señal de reconciliación fallida — no se perdió esa información, solo la tabla paralela de alertas.
+- Si en el futuro vuelven a pedirlas, leer este commit y el plan en `~/.claude/plans/sunny-toasting-abelson.md` antes de reimplementar.
 
 #### T Parser — Formato de fecha variable y corrección de año
 - Los archivos T pueden tener fecha `DD-MM-YY` (2 dígitos de año) o `DD-MM-YYYY` (4 dígitos). El regex usa `\d{2,4}`.
@@ -372,6 +377,41 @@ Cada vez que se detecte un error de parsing o reconciliación que se repita 3+ v
 - `tank_levels` ahora escucha `event: '*'` (INSERT + UPDATE), no solo INSERT.
 - Cuando un T file se reprocesa (upsert → UPDATE en WAL), el frontend se actualiza sin refresh manual.
 - `daily_closings` ya escuchaba `event: '*'` — correcto para P→S merge.
+
+#### Servicio Windows — paths relativos y CWD=System32 (2026-04-15)
+- Un servicio Windows corre con `CWD=C:\Windows\System32`. Cualquier path relativo (`.env`, `log_file`, `dead_letter_path`) se resuelve desde ahí, NO desde el directorio del agente.
+- **Síntoma observado:** `setup.ps1` instala todo OK, `sc query` reporta `RUNNING`, pero el watcher muere en segundos porque `load_dotenv()` no encuentra `.env` → `service_key=""` → `sys.exit(1)`. SCM reinicia en loop infinito y el dueño no ve datos nuevos.
+- **Fixes aplicados:**
+  - `load_dotenv(_AGENT_DIR / ".env")` con path absoluto en `watcher.py` y `scheduled_scan.py`.
+  - `setup.ps1` genera `config.yaml` con `log_file: 'C:\StationOS\logs\edge_agent.log'` y `dead_letter_path: 'C:\StationOS\logs\dead_letter\'`.
+  - Las 3 `sys.exit(1)` en `watcher.main()` se reemplazaron por `raise RuntimeError(...)` para que `_resilient_watcher` las cachee como `Exception` y reintente con backoff de 10s. Antes, `SystemExit` (heredado de `BaseException`) se escapaba del `except Exception` y mataba el thread silenciosamente.
+  - `service.py._resilient_watcher` ahora también cachea `SystemExit` por las dudas, con backoff de 30s.
+
+#### setup.ps1 — verificación post-install efectiva
+- `sc query STATE=RUNNING` es FALSO POSITIVO si el thread del watcher murió silenciosamente. La única señal real de que el agente está procesando es `stations.last_heartbeat` < 90s atrás.
+- El instalador ahora hace polling de `last_heartbeat` durante 90s después de `sc start` y solo declara éxito si ve un heartbeat fresco. Si no, muestra las últimas líneas del log.
+
+#### Watcher — rescan periódico cada 30 min (red de seguridad)
+- Watchdog puede perder eventos en discos lentos, pausas del SO o cuando el OS está bajo carga. Para garantizar la promesa "todos los archivos por hora", el watcher hace un rescan completo de `C:\SVAPP` cada 30 minutos en su loop principal.
+- La idempotencia MD5 en `state.json` garantiza que esto no duplica registros — los archivos ya procesados se saltean en el `is_processed()` check antes de leerse el contenido.
+- Tareas programadas (06:15/14:15/22:15) siguen siendo el respaldo "fuera de proceso" si el servicio está caído.
+
+#### Watcher — `_is_today` cubre turno noche cruzando medianoche
+- Los archivos del turno noche (22-06) se escriben con la fecha del día anterior. Si se procesan después de medianoche, el `_is_today()` original los descartaba como "histórico" y nunca los reprocesaba aunque su MD5 hubiera cambiado.
+- Fix: si la hora actual es < 03:00, también se acepta como "hoy" la fecha de ayer.
+
+#### Scheduled_scan — fallback completo del botón refresh
+- Si el servicio principal está caído, `scheduled_scan.py` (Task Scheduler 06:15/14:15/22:15) ahora también marca como `completed` cualquier `scan_request` pendiente al final de su run. Sin esto, el botón "Actualizar Datos" del dashboard quedaba colgado en `pending` para siempre.
+- Además, antes leía config con keys planos (`config["watch_path"]`, etc.) que no existían — el config real es anidado. Refactor completo a la estructura correcta + `load_dotenv()`.
+
+#### Refresh button — multi-station + realtime (2026-04-15)
+- El botón "Actualizar Datos" inserta UN scan_request por cada estación del dueño (RLS filtra a las suyas) — antes solo refrescaba `activeStationId || stations[0]`.
+- La detección de completion usa **realtime sobre `scan_requests`** (publication agregada en migration `20260415_scan_requests_realtime.sql`) — instantáneo, sin polling de 3s.
+- Polling de 5s queda como fallback si realtime falla. Timeout total: 90s. Si > 3 errores consecutivos en el poll, aborta con toast claro.
+- Toast final agrega `M archivos en N estaciones`, separa "todas con error" / "algunas con error" / "todo OK".
+
+#### Logging — Cambiar prefijo desconocido a WARNING
+- Si aparece un archivo con prefijo no mapeado en `FILE_PREFIX_MAP` (ej. tipo de archivo VB nuevo), `process_file()` ahora lo loguea como WARNING en vez de DEBUG. Antes el archivo se descartaba en silencio sin que el dueño/dev se enterara.
 
 ---
 

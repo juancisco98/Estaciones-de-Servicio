@@ -6,8 +6,6 @@ import {
     CardPayment,
     TankLevel,
     DailyClosing,
-    Alert,
-    AlertLevel,
     AppNotification,
     AllowedEmail,
     CashClosing,
@@ -18,7 +16,7 @@ import {
     DbDailyClosingRow,
     DbCardPaymentRow,
     DbCashClosingRow,
-    DbAlertRow,
+    DbStationRow,
     DbNotificationRow,
     DbAllowedEmailRow,
 } from '../types/dbRows';
@@ -31,7 +29,6 @@ import {
     dbToCardPayment,
     dbToTankLevel,
     dbToDailyClosing,
-    dbToAlert,
     dbToNotification,
     dbToAllowedEmail,
     dbToCashClosing,
@@ -39,7 +36,7 @@ import {
 import { handleError } from '../utils/errorHandler';
 import { TRANSACTIONS_LOAD_DAYS, RT_CHANNELS } from '../constants';
 import { toast } from 'sonner';
-import { AlertTriangle, Info, CheckCircle } from 'lucide-react';
+import { CheckCircle } from 'lucide-react';
 
 interface DataContextType {
     stations: Station[];
@@ -54,19 +51,14 @@ interface DataContextType {
     setTankLevels: React.Dispatch<React.SetStateAction<TankLevel[]>>;
     dailyClosings: DailyClosing[];
     setDailyClosings: React.Dispatch<React.SetStateAction<DailyClosing[]>>;
-    alerts: Alert[];
-    setAlerts: React.Dispatch<React.SetStateAction<Alert[]>>;
     cashClosings: CashClosing[];
     setCashClosings: React.Dispatch<React.SetStateAction<CashClosing[]>>;
     allowedEmails: AllowedEmail[];
     setAllowedEmails: React.Dispatch<React.SetStateAction<AllowedEmail[]>>;
     notifications: AppNotification[];
     unreadCount: number;
-    unresolvedAlertCount: number;
-    criticalAlertCount: number;
     markNotificationRead: (id: string) => Promise<void>;
     markAllNotificationsRead: () => Promise<void>;
-    resolveAlert: (id: string) => Promise<void>;
     isLoading: boolean;
     refreshData: () => Promise<void>;
 }
@@ -81,14 +73,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [tankLevels, setTankLevels]               = useState<TankLevel[]>([]);
     const [dailyClosings, setDailyClosings]         = useState<DailyClosing[]>([]);
     const [cashClosings, setCashClosings]             = useState<CashClosing[]>([]);
-    const [alerts, setAlerts]                       = useState<Alert[]>([]);
     const [notifications, setNotifications]         = useState<AppNotification[]>([]);
     const [allowedEmails, setAllowedEmails]         = useState<AllowedEmail[]>([]);
     const [isLoading, setIsLoading]                 = useState(true);
 
     const unreadCount = notifications.filter(n => !n.read).length;
-    const unresolvedAlertCount = alerts.filter(a => !a.resolved).length;
-    const criticalAlertCount   = alerts.filter(a => !a.resolved && a.level === 'CRITICAL').length;
 
     const markNotificationRead = useCallback(async (id: string) => {
         setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
@@ -101,16 +90,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setNotifications(prev => prev.map(n => ({ ...n, read: true })));
         await supabase.from('notifications').update({ read: true }).in('id', unreadIds);
     }, [notifications]);
-
-    const resolveAlert = useCallback(async (id: string) => {
-        setAlerts(prev => prev.map(a =>
-            a.id === id ? { ...a, resolved: true, resolvedAt: new Date().toISOString() } : a
-        ));
-        await supabase
-            .from('alerts')
-            .update({ resolved: true, resolved_at: new Date().toISOString() })
-            .eq('id', id);
-    }, []);
 
     const loadData = async () => {
         setIsLoading(true);
@@ -126,7 +105,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 txResult,
                 closingsResult,
                 tanksResult,
-                alertsResult,
                 notificationsResult,
             ] = await Promise.all([
                 supabase.from('stations').select('*').order('name', { ascending: true }),
@@ -141,10 +119,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     .gte('recorded_at', dateCutoffDate)
                     .order('recorded_at', { ascending: false })
                     .limit(1000),
-                supabase.from('alerts').select('*')
-                    .eq('resolved', false)
-                    .order('created_at', { ascending: false })
-                    .limit(200),
                 supabase.from('notifications').select('*')
                     .order('created_at', { ascending: false }).limit(50),
             ]);
@@ -155,7 +129,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (txResult.error)            console.error('[DataContext] sales_transactions error:', txResult.error);
             if (closingsResult.error)      console.error('[DataContext] daily_closings error:', closingsResult.error);
             if (tanksResult.error)         console.error('[DataContext] tank_levels error:', tanksResult.error);
-            if (alertsResult.error)        console.error('[DataContext] alerts error:', alertsResult.error);
             if (notificationsResult.error) console.error('[DataContext] notifications error:', notificationsResult.error);
 
             if (stationsResult.data)      setStations(stationsResult.data.map(dbToStation));
@@ -163,7 +136,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (txResult.data)            setSalesTransactions(txResult.data.map(dbToSalesTransaction));
             if (closingsResult.data)      setDailyClosings(closingsResult.data.map(dbToDailyClosing));
             if (tanksResult.data)         setTankLevels(tanksResult.data.map(dbToTankLevel));
-            if (alertsResult.data)        setAlerts(alertsResult.data.map(dbToAlert));
             if (notificationsResult.data) setNotifications(notificationsResult.data.map(dbToNotification));
 
             try {
@@ -260,43 +232,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 }
             ).subscribe();
 
-        const alertsChannel = supabase
-            .channel(RT_CHANNELS.ALERTS)
+        const stationsChannel = supabase
+            .channel(RT_CHANNELS.STATIONS)
             .on('postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'alerts' },
+                { event: 'UPDATE', schema: 'public', table: 'stations' },
                 (payload) => {
-                    const alert = dbToAlert(payload.new as DbAlertRow);
-                    setAlerts(prev => {
-                        if (prev.some(a => a.id === alert.id)) return prev;
-                        return [alert, ...prev];
-                    });
-
-                    if (alert.level === 'CRITICAL') {
-                        toast.error(alert.title, {
-                            description: alert.message,
-                            duration: 10000,
-                            icon: React.createElement(AlertTriangle, { className: 'w-4 h-4 text-red-500' }),
-                        });
-                    } else if (alert.level === 'WARNING') {
-                        toast.warning(alert.title, {
-                            description: alert.message,
-                            duration: 7000,
-                            icon: React.createElement(AlertTriangle, { className: 'w-4 h-4 text-orange-500' }),
-                        });
-                    } else {
-                        toast(alert.title, {
-                            description: alert.message,
-                            duration: 5000,
-                            icon: React.createElement(Info, { className: 'w-4 h-4 text-blue-500' }),
-                        });
-                    }
-                }
-            )
-            .on('postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'alerts' },
-                (payload) => {
-                    setAlerts(prev => prev.map(a =>
-                        a.id === payload.new.id ? dbToAlert(payload.new as DbAlertRow) : a
+                    setStations(prev => prev.map(s =>
+                        s.id === payload.new.id ? dbToStation(payload.new as DbStationRow) : s
                     ));
                 }
             ).subscribe();
@@ -370,7 +312,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             supabase.removeChannel(closingsChannel);
             supabase.removeChannel(cardPaymentsChannel);
             supabase.removeChannel(cashClosingsChannel);
-            supabase.removeChannel(alertsChannel);
+            supabase.removeChannel(stationsChannel);
             supabase.removeChannel(notificationsChannel);
         };
     }, []);
@@ -384,15 +326,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             tankLevels,           setTankLevels,
             dailyClosings,        setDailyClosings,
             cashClosings,         setCashClosings,
-            alerts,               setAlerts,
             allowedEmails,        setAllowedEmails,
             notifications,
             unreadCount,
-            unresolvedAlertCount,
-            criticalAlertCount,
             markNotificationRead,
             markAllNotificationsRead,
-            resolveAlert,
             isLoading,
             refreshData: loadData,
         }}>

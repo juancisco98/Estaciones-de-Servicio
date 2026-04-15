@@ -13,8 +13,6 @@ interface HeaderProps {
     onRefresh: () => void;
     isLoading: boolean;
     onMapSearch?: (lat: number, lng: number) => void;
-    unresolvedAlertCount?: number;
-    criticalAlertCount?: number;
 }
 
 const timeAgo = (dateStr: string): string => {
@@ -82,10 +80,8 @@ const Header: React.FC<HeaderProps> = ({
     onRefresh,
     isLoading,
     onMapSearch,
-    unresolvedAlertCount = 0,
-    criticalAlertCount = 0,
 }) => {
-    const { notifications, unreadCount, markNotificationRead, markAllNotificationsRead, salesTransactions, dailyClosings, stations } = useDataContext();
+    const { notifications, unreadCount, markNotificationRead, markAllNotificationsRead, stations } = useDataContext();
     const [showNotifications, setShowNotifications] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
@@ -117,43 +113,25 @@ const Header: React.FC<HeaderProps> = ({
         } finally { setIsSearching(false); }
     };
 
-    const totalBadge = unreadCount + unresolvedAlertCount;
+    const totalBadge = unreadCount;
 
     const stationHealth = useMemo(() => {
         const now = Date.now();
         const healthMap = new Map<string, { name: string; lastSync: number; ago: string; status: 'OK' | 'WARNING' | 'CRITICAL' }>();
 
         for (const st of stations) {
-            let latest = 0;
-
-            for (const tx of salesTransactions) {
-                if (tx.stationId === st.id && tx.transactionTs) {
-                    const t = new Date(tx.transactionTs).getTime();
-                    if (t > latest) latest = t;
-                }
-            }
-            for (const dc of dailyClosings) {
-                if (dc.stationId === st.id) {
-                    const ts = dc.pClosingTs || dc.sClosingTs || dc.createdAt;
-                    if (ts) {
-                        const t = new Date(ts).getTime();
-                        if (t > latest) latest = t;
-                    }
-                }
-            }
-
-            if (latest === 0) {
-                healthMap.set(st.id, { name: st.name, lastSync: 0, ago: 'Sin datos', status: 'CRITICAL' });
+            if (!st.lastHeartbeat) {
+                healthMap.set(st.id, { name: st.name, lastSync: 0, ago: 'Sin señal', status: 'CRITICAL' });
                 continue;
             }
-
-            const diffHours = (now - latest) / 3600000;
-            const status = diffHours < 12 ? 'OK' : diffHours < 24 ? 'WARNING' : 'CRITICAL';
-            healthMap.set(st.id, { name: st.name, lastSync: latest, ago: timeAgo(new Date(latest).toISOString()), status });
+            const latest = new Date(st.lastHeartbeat).getTime();
+            const diffMin = (now - latest) / 60000;
+            const status = diffMin < 5 ? 'OK' : diffMin < 30 ? 'WARNING' : 'CRITICAL';
+            healthMap.set(st.id, { name: st.name, lastSync: latest, ago: timeAgo(st.lastHeartbeat), status });
         }
 
         return healthMap;
-    }, [stations, salesTransactions, dailyClosings]);
+    }, [stations]);
 
     const overallStatus = useMemo(() => {
         if (stationHealth.size === 0) return 'OK' as const;
@@ -284,7 +262,7 @@ const Header: React.FC<HeaderProps> = ({
                                                         ${h.status === 'OK' ? 'text-emerald-600 dark:text-emerald-400' :
                                                           h.status === 'WARNING' ? 'text-amber-600 dark:text-amber-400' :
                                                           'text-red-600 dark:text-red-400'}`}>
-                                                        {h.lastSync === 0 ? 'Sin datos recibidos' : `Última sync: ${h.ago}`}
+                                                        {h.lastSync === 0 ? 'Sin señal del agente' : `Último heartbeat: ${h.ago}`}
                                                     </p>
                                                 </div>
                                                 <span className={`text-[10px] font-black px-2 py-0.5 rounded-full
@@ -313,11 +291,11 @@ const Header: React.FC<HeaderProps> = ({
                         >
                             <Bell className="w-[18px] h-[18px]" />
                             {totalBadge > 0 && (
-                                <span className={`absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-0.5
+                                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-0.5
                                                   text-white text-[10px] font-black rounded-full
                                                   border-2 border-white dark:border-slate-900
                                                   flex items-center justify-center leading-none
-                                                  ${criticalAlertCount > 0 ? 'bg-red-500' : 'bg-amber-500'}`}>
+                                                  bg-amber-500">
                                     {totalBadge > 9 ? '9+' : totalBadge}
                                 </span>
                             )}

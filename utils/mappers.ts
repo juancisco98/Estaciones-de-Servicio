@@ -9,9 +9,6 @@ import {
   TankId,
   DailyClosing,
   ClosingStatus,
-  Alert,
-  AlertLevel,
-  AlertType,
   AppNotification,
   NotificationType,
   PaymentMethod,
@@ -33,7 +30,6 @@ import {
   DbCardPaymentRow,
   DbTankLevelRow,
   DbDailyClosingRow,
-  DbAlertRow,
   DbNotificationRow,
   DbStationKnowledgeRow,
   DbAllowedEmailRow,
@@ -55,6 +51,7 @@ export const dbToStation = (row: DbStationRow): Station => ({
   stationCode: row.station_code ?? undefined,
   watchPath:   row.watch_path ?? undefined,
   notes:       row.notes ?? undefined,
+  lastHeartbeat: row.last_heartbeat ?? undefined,
   createdAt:   row.created_at,
   updatedAt:   row.updated_at,
 });
@@ -259,37 +256,6 @@ export const dbToCashClosing = (row: DbCashClosingRow): CashClosing => ({
   closingTs:    row.closing_ts ?? undefined,
   aFileName:    row.a_file_name ?? undefined,
   createdAt:    row.created_at,
-});
-
-export const dbToAlert = (row: DbAlertRow): Alert => ({
-  id:          row.id,
-  stationId:   row.station_id ?? undefined,
-  level:       row.level as AlertLevel,
-  type:        row.type as AlertType,
-  title:       row.title,
-  message:     row.message,
-  relatedDate: row.related_date ?? undefined,
-  relatedFile: row.related_file ?? undefined,
-  resolved:    row.resolved,
-  resolvedAt:  row.resolved_at ?? undefined,
-  resolvedBy:  row.resolved_by ?? undefined,
-  metadata:    row.metadata ?? undefined,
-  createdAt:   row.created_at,
-});
-
-export const alertToDb = (alert: Alert): Record<string, unknown> => ({
-  id:           alert.id,
-  station_id:   alert.stationId ?? null,
-  level:        alert.level,
-  type:         alert.type,
-  title:        alert.title,
-  message:      alert.message,
-  related_date: alert.relatedDate ?? null,
-  related_file: alert.relatedFile ?? null,
-  resolved:     alert.resolved,
-  resolved_at:  alert.resolvedAt ?? null,
-  resolved_by:  alert.resolvedBy ?? null,
-  metadata:     alert.metadata ?? null,
 });
 
 export const dbToNotification = (row: DbNotificationRow): AppNotification => ({

@@ -55,7 +55,40 @@ class StateManager:
         }
         self._path.write_text(json.dumps(tmp, indent=2), encoding="utf-8")
 
+    def _is_today(self, file_path: str) -> bool:
+        try:
+            name = os.path.basename(file_path).upper()
+            import re
+            digits = re.sub(r'^[A-Z]+', '', os.path.splitext(name)[0])
+            if len(digits) >= 4:
+                dd = int(digits[0:2])
+                mm = int(digits[2:4])
+                now = datetime.now()
+                today = now.date()
+                if dd == today.day and mm == today.month:
+                    return True
+                # Cobertura turno noche: si son < 03:00, también tratar el día de
+                # ayer como "hoy" (los archivos de cierre de turno noche aparecen
+                # entre 22:00 y 06:00 con la fecha del día anterior en el nombre).
+                if now.hour < 3:
+                    from datetime import timedelta
+                    yesterday = today - timedelta(days=1)
+                    if dd == yesterday.day and mm == yesterday.month:
+                        return True
+        except Exception:
+            pass
+        return False
+
     def is_processed(self, file_path: str, md5: str) -> bool:
+        # FIX 1: Archivos de HOY siempre se reprocesан
+        if self._is_today(file_path):
+            with self._lock:
+                entry = self._state.get(file_path)
+                if entry is None:
+                    return False
+                # Solo skipear si el MD5 es exactamente el mismo
+                # (el archivo no cambió desde el último procesamiento)
+                return entry.get("md5") == md5
         with self._lock:
             entry = self._state.get(file_path)
             if entry is None:
@@ -144,7 +177,7 @@ def process_file(
 
     parser = _get_parser(file_path, station_id)
     if parser is None:
-        logger.debug("No parser for %s", os.path.basename(file_path))
+        logger.warning("No parser for %s (prefijo no reconocido)", os.path.basename(file_path))
         return
 
     logger.info("Processing %s (station=%s)", os.path.basename(file_path), station_id[:8])
@@ -162,12 +195,6 @@ def process_file(
     success = uploader.upload_parse_result(result)
 
     if success:
-        try:
-            from alert_checker import AlertChecker
-            AlertChecker(uploader).check_alerts(result, station_id)
-        except Exception as exc:
-            logger.warning("Alert check failed: %s", exc)
-
         state.mark_processed(
             file_path=file_path,
             md5=file_md5,
@@ -272,7 +299,8 @@ def _load_config(config_path: Path) -> dict:
 
 
 def main(config_path: Path = _DEFAULT_CONFIG, stop_event: Event | None = None) -> None:
-    load_dotenv()
+    # Carga .env desde el directorio del agente (el servicio Windows corre con CWD=System32)
+    load_dotenv(_AGENT_DIR / ".env")
 
     config = _load_config(config_path)
     _setup_logging(config)
@@ -284,7 +312,7 @@ def main(config_path: Path = _DEFAULT_CONFIG, stop_event: Event | None = None) -
     service_key = os.environ.get(service_key_env, "")
     if not service_key:
         logger.critical("Missing Supabase service key (env var: %s)", service_key_env)
-        sys.exit(1)
+        raise RuntimeError(f"Missing Supabase service key (env var: {service_key_env})")
 
     watch_root = Path(config["watcher"]["watch_path"])
     station_id: str = config.get("station_id", "")
@@ -293,11 +321,11 @@ def main(config_path: Path = _DEFAULT_CONFIG, stop_event: Event | None = None) -
 
     if not watch_root.exists():
         logger.critical("Watch path does not exist: %s", watch_root)
-        sys.exit(1)
+        raise RuntimeError(f"Watch path does not exist: {watch_root}")
 
     if not station_id:
         logger.critical("No station_id configured in config.yaml")
-        sys.exit(1)
+        raise RuntimeError("No station_id configured in config.yaml")
 
     state = StateManager()
     uploader = SupabaseUploader(supabase_url, service_key, config)
@@ -315,42 +343,80 @@ def main(config_path: Path = _DEFAULT_CONFIG, stop_event: Event | None = None) -
     import glob
     existing = list(set(glob.glob(str(watch_root / "*.TXT")) + glob.glob(str(watch_root / "*.txt"))))
     if existing:
-        logger.info("Escaneo inicial: %d archivos", len(existing))
+        logger.info("Escaneo inicial: %d archivos TXT encontrados en %s", len(existing), watch_root)
         for fpath in sorted(existing):
             process_file(fpath, station_id, state, uploader, max_file_bytes)
+        logger.info("Escaneo inicial completo.")
     else:
         logger.info("No hay archivos en %s", watch_root)
 
     observer.start()
     logger.info("Watching %s for station %s", watch_root, station_id[:8])
+    logger.info("Press Ctrl+C to stop.")
 
     try:
         poll_counter = 0
+        heartbeat_counter = 0
+        rescan_counter = 0
+        uploader.send_heartbeat(station_id)
         while stop_event is None or not stop_event.is_set():
-            time.sleep(1)
-            poll_counter += 1
-            if poll_counter >= 15:
-                poll_counter = 0
-                try:
-                    pending = uploader.check_scan_request(station_id)
-                    if pending:
-                        req_id = pending["id"]
-                        logger.info("Scan request %s received (FORCE rescan)", req_id[:8])
-                        uploader.update_scan_status(req_id, "processing")
-                        scan_files = list(set(
+            try:
+                time.sleep(1)
+                poll_counter += 1
+                heartbeat_counter += 1
+                rescan_counter += 1
+
+                if not observer.is_alive():
+                    logger.error("Observer died, restarting...")
+                    observer.stop()
+                    observer = Observer()
+                    observer.schedule(handler, str(watch_root), recursive=False)
+                    observer.start()
+                    logger.info("Observer restarted.")
+
+                if heartbeat_counter >= 60:
+                    heartbeat_counter = 0
+                    try:
+                        uploader.send_heartbeat(station_id)
+                    except Exception as exc:
+                        logger.debug("Heartbeat error: %s", exc)
+
+                if poll_counter >= 15:
+                    poll_counter = 0
+                    try:
+                        pending = uploader.check_scan_request(station_id)
+                        if pending:
+                            req_id = pending["id"]
+                            logger.info("Scan request %s received (FORCE rescan)", req_id[:8])
+                            uploader.update_scan_status(req_id, "processing")
+                            scan_files = list(set(
+                                glob.glob(str(watch_root / "*.TXT")) +
+                                glob.glob(str(watch_root / "*.txt"))
+                            ))
+                            for fpath in sorted(scan_files):
+                                process_file(fpath, station_id, state, uploader, max_file_bytes, force=True)
+                            uploader.update_scan_status(req_id, "completed", len(scan_files))
+                            logger.info("Scan request %s completed: %d files scanned", req_id[:8], len(scan_files))
+                    except Exception as exc:
+                        logger.warning("Scan request poll error: %s", exc)
+
+                if rescan_counter >= 1800:
+                    rescan_counter = 0
+                    try:
+                        rescan_files = list(set(
                             glob.glob(str(watch_root / "*.TXT")) +
                             glob.glob(str(watch_root / "*.txt"))
                         ))
-                        # El boton de auxilio bypassa state.json. La DB tiene
-                        # unique constraints (station_id, file_name, raw_line)
-                        # y los IDs son deterministicos, asi que reprocesar es
-                        # un UPSERT no-op seguro sin duplicados.
-                        for fpath in sorted(scan_files):
-                            process_file(fpath, station_id, state, uploader, max_file_bytes, force=True)
-                        uploader.update_scan_status(req_id, "completed", len(scan_files))
-                        logger.info("Scan request %s completed", req_id[:8])
-                except Exception as exc:
-                    logger.warning("Scan request poll error: %s", exc)
+                        logger.info("Rescan periódico: %d archivos en %s", len(rescan_files), watch_root)
+                        for fpath in sorted(rescan_files):
+                            process_file(fpath, station_id, state, uploader, max_file_bytes)
+                    except Exception as exc:
+                        logger.warning("Rescan periódico falló: %s", exc)
+
+            except Exception as exc:
+                logger.error("Unexpected error in main loop: %s — continuing...", exc)
+                time.sleep(5)
+
     except KeyboardInterrupt:
         logger.info("Shutdown requested...")
     finally:
@@ -363,4 +429,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Station-OS Edge Agent")
     parser.add_argument("--config", type=Path, default=_DEFAULT_CONFIG)
     args = parser.parse_args()
-    main(config_path=args.config)
+    try:
+        main(config_path=args.config)
+    except RuntimeError as exc:
+        print(f"FATAL: {exc}", file=sys.stderr)
+        sys.exit(1)
+

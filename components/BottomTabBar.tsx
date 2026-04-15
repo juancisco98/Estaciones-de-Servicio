@@ -1,21 +1,17 @@
 import React, { useState } from 'react';
-import { Map as MapIcon, AlertTriangle, ShoppingCart, Droplets, MoreHorizontal, ClipboardCheck, BarChart3, Settings, Gauge, X } from 'lucide-react';
+import { Map as MapIcon, ShoppingCart, Droplets, MoreHorizontal, ClipboardCheck, BarChart3, Settings, Gauge, X } from 'lucide-react';
 import { ViewState } from './Sidebar';
 
 interface BottomTabBarProps {
     currentView: ViewState;
     onViewChange: (view: ViewState) => void;
     className?: string;
-    unresolvedAlertCount?: number;
-    criticalAlertCount?: number;
 }
 
 const BottomTabBar: React.FC<BottomTabBarProps> = ({
     currentView,
     onViewChange,
     className = '',
-    unresolvedAlertCount = 0,
-    criticalAlertCount = 0,
 }) => {
     const [showMore, setShowMore] = useState(false);
 
@@ -27,14 +23,8 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({
         badgeCritical?: boolean;
     }[] = [
         { id: 'MAP',    label: 'Mapa',    icon: MapIcon },
-        {
-            id: 'ALERTS',
-            label: 'Alertas',
-            icon: AlertTriangle,
-            badge: unresolvedAlertCount > 0 ? unresolvedAlertCount : undefined,
-            badgeCritical: criticalAlertCount > 0,
-        },
         { id: 'SALES',  label: 'Ventas',  icon: ShoppingCart },
+        { id: 'TANKS',  label: 'Tanques', icon: Droplets },
     ];
 
     const moreTabs: {
@@ -42,7 +32,6 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({
         label: string;
         icon: React.ComponentType<{ className?: string }>;
     }[] = [
-        { id: 'TANKS',          label: 'Tanques',        icon: Droplets },
         { id: 'STATIONS',      label: 'Estaciones',     icon: Gauge },
         { id: 'PLAYA',          label: 'Playa',           icon: ClipboardCheck },
         { id: 'SHOP',           label: 'Mini Mercado',    icon: ClipboardCheck },

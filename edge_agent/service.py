@@ -56,9 +56,18 @@ if _WIN32_AVAILABLE:
 
             try:
                 self._start_watcher()
-                win32event.WaitForSingleObject(
-                    self._scm_stop_event, win32event.INFINITE
-                )
+                while True:
+                    rc = win32event.WaitForSingleObject(self._scm_stop_event, 30000)
+                    if rc == win32event.WAIT_OBJECT_0:
+                        break
+                    if self._watcher_thread is None or not self._watcher_thread.is_alive():
+                        if self._stop_event.is_set():
+                            break
+                        logger.error("[Service] Watcher thread died silently. Relaunching...")
+                        servicemanager.LogErrorMsg(
+                            f"{SERVICE_NAME} watcher thread died silently, relaunching"
+                        )
+                        self._start_watcher()
             except Exception as exc:
                 logger.exception("[Service] Fatal error in SvcDoRun: %s", exc)
                 servicemanager.LogErrorMsg(f"{SERVICE_NAME} crashed: {exc}")
@@ -83,6 +92,17 @@ if _WIN32_AVAILABLE:
                     try:
                         logger.info("[Service] Watcher starting (config=%s)", config_path)
                         run_watcher(config_path=config_path, stop_event=self._stop_event)
+                    except SystemExit as exc:
+                        if self._stop_event.is_set():
+                            break
+                        logger.error(
+                            "[Service] Watcher called sys.exit(%s). Restarting in 30s...",
+                            exc.code,
+                        )
+                        servicemanager.LogErrorMsg(
+                            f"{SERVICE_NAME} watcher exited with code {exc.code}"
+                        )
+                        self._stop_event.wait(30)
                     except Exception as exc:
                         if self._stop_event.is_set():
                             break

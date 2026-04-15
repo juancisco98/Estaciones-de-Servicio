@@ -176,40 +176,17 @@ class SupabaseUploader:
             logger.debug("HTTP GET failed: %s", exc)
             return None
 
-    def insert_alert(
-        self,
-        station_id: str,
-        level: str,
-        alert_type: str,
-        title: str,
-        message: str,
-        related_date: str | None = None,
-        related_file: str | None = None,
-        metadata: dict | None = None,
-    ) -> bool:
-        import uuid as _uuid
-        url = f"{self.base_url}/rest/v1/alerts"
-        body = {
-            "id": str(_uuid.uuid4()),
-            "station_id": station_id,
-            "level": level,
-            "type": alert_type,
-            "title": title,
-            "message": message,
-            "related_date": related_date,
-            "related_file": related_file,
-            "resolved": False,
-            "metadata": metadata or {},
-        }
+    def send_heartbeat(self, station_id: str) -> bool:
+        url = f"{self.base_url}/rest/v1/stations"
+        params = {"id": f"eq.{station_id}"}
+        body = {"last_heartbeat": datetime.now(timezone.utc).isoformat()}
         try:
-            resp = httpx.post(url, json=body, headers=self._headers, timeout=10.0)
-            if resp.status_code in (200, 201):
-                logger.info("Alert created: [%s] %s", level, title)
-                return True
-            logger.warning("Alert insert failed %d: %s", resp.status_code, resp.text[:200])
-            return False
+            resp = httpx.patch(
+                url, json=body, headers=self._headers, params=params, timeout=10.0
+            )
+            return resp.status_code in (200, 204)
         except Exception as exc:
-            logger.warning("Alert insert error: %s", exc)
+            logger.debug("Heartbeat failed: %s", exc)
             return False
 
     def check_scan_request(self, station_id: str) -> dict | None:

@@ -233,32 +233,6 @@ def _retro_normalize_transactions(station_id: str, product_code: str, canonical_
     return total
 
 
-def _insert_normalization_alert(station_id: str, product_code: str, canonical_name: str, rows_updated: int) -> None:
-    """Emit an INFO alert to confirm the retro-normalization completed."""
-    alert = {
-        "id":         str(uuid.uuid4()),
-        "station_id": station_id,
-        "level":      "INFO",
-        "type":       "UNKNOWN_PRODUCT",
-        "title":      f"Producto Clasificado: {product_code}",
-        "message": (
-            f"Código '{product_code}' clasificado como '{canonical_name}'. "
-            f"{rows_updated} transacciones normalizadas retroactivamente."
-            if rows_updated >= 0
-            else f"Código '{product_code}' clasificado como '{canonical_name}'."
-        ),
-        "resolved":   True,   # auto-resolve since it's purely informational
-        "metadata": {
-            "product_code":   product_code,
-            "canonical_name": canonical_name,
-            "rows_updated":   rows_updated,
-        },
-    }
-    resp = httpx.post(_rest("alerts"), headers=_headers(), json=alert, timeout=10.0)
-    if not resp.is_success:
-        logger.warning("Could not insert normalization alert: %s", resp.text[:200])
-
-
 # ── Cloud Function entry point ────────────────────────────────────────────────
 
 @functions_framework.http
@@ -341,10 +315,6 @@ def update_knowledge(request):
                 if entity_type == "product":
                     rows_updated = _retro_normalize_transactions(sid, raw_code, canonical_name)
                     total_rows_normalized += max(rows_updated, 0)
-
-                # Emit INFO alert for the primary station (not all propagated ones, to avoid noise)
-                if sid == station_id_param or (propagate_globally and rows_updated > 0):
-                    _insert_normalization_alert(sid, raw_code, canonical_name, rows_updated)
 
                 stations_updated += 1
 

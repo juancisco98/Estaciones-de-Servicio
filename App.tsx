@@ -20,7 +20,6 @@ import { useEmployees } from './hooks/useEmployees';
 import { useSalesTransactions } from './hooks/useSalesTransactions';
 import { useDailyClosings } from './hooks/useDailyClosings';
 import { useTankLevels } from './hooks/useTankLevels';
-import { useAlerts } from './hooks/useAlerts';
 import { useAnalytics } from './hooks/useAnalytics';
 
 import type { Session } from '@supabase/supabase-js';
@@ -31,7 +30,6 @@ import { Capacitor } from '@capacitor/core';
 const StationsView       = lazy(() => import('./components/StationsView'));
 const SalesHistoryView   = lazy(() => import('./components/SalesHistoryView'));
 const TankLevelsView     = lazy(() => import('./components/TankLevelsView'));
-const AlertsView         = lazy(() => import('./components/AlertsView'));
 const PlayaView          = lazy(() => import('./components/PlayaView'));
 const ShopView           = lazy(() => import('./components/ShopView'));
 const CardPaymentsView   = lazy(() => import('./components/CardPaymentsView'));
@@ -40,7 +38,7 @@ const AnalyticsDashboard = lazy(() => import('./components/AnalyticsDashboard'))
 const AdminSettings      = lazy(() => import('./components/AdminSettings'));
 const StationCard        = lazy(() => import('./components/StationCard'));
 
-const VALID_VIEWS: ViewState[] = ['MAP', 'STATIONS', 'SALES', 'TANKS', 'ALERTS', 'PLAYA', 'SHOP', 'ACCOUNTS', 'CAJA', 'ANALYTICS', 'SETTINGS'];
+const VALID_VIEWS: ViewState[] = ['MAP', 'STATIONS', 'SALES', 'TANKS', 'PLAYA', 'SHOP', 'ACCOUNTS', 'CAJA', 'ANALYTICS', 'SETTINGS'];
 
 const LoadingFallback = () => (
   <div className="flex items-center justify-center h-full">
@@ -61,13 +59,12 @@ const Dashboard: React.FC = () => {
   const [activeStationId, setActiveStationId] = useState<string | null>(null);
   const [mapFlyTo, setMapFlyTo]               = useState<[number, number] | undefined>(undefined);
 
-  const { isLoading, refreshData, unresolvedAlertCount, criticalAlertCount, cashClosings } = useDataContext();
+  const { isLoading, refreshData, cashClosings } = useDataContext();
   const { stations, saveStation, deactivateStation, deleteStation } = useStations();
   const { employees } = useEmployees();
   const { salesTransactions }                           = useSalesTransactions();
   const { dailyClosings, addNotes, discrepancyCount }   = useDailyClosings();
   const { tankLevels }                                  = useTankLevels();
-  const { alerts, resolveAlert }                        = useAlerts();
   const { getStationMetrics, getDailyTimeSeries, getNetworkSummary, getPeriodSummary } = useAnalytics();
 
   // ── Refresh button (triggers edge agent scan via Supabase) ──
@@ -75,55 +72,115 @@ const Dashboard: React.FC = () => {
 
   const handleRefresh = useCallback(async () => {
     if (isRefreshing) return;
-    // Find which station to refresh (active or first)
-    const stationId = activeStationId || stations[0]?.id;
-    if (!stationId) return;
+    if (stations.length === 0) return;
 
     setIsRefreshing(true);
     const { toast } = await import('sonner');
+    const { generateUUID } = await import('./utils/generateUUID');
+
+    // Una solicitud por estación del dueño (RLS ya filtra a las suyas).
+    const requests = stations.map(s => ({
+      id: generateUUID(),
+      station_id: s.id,
+      requested_by: currentUser?.email ?? null,
+    }));
+    const requestIds = new Set<string>(requests.map(r => r.id));
+    const finalized = new Map<string, { status: string; files: number }>();
+
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+    let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
+    const channel = supabase.channel(`scan-${Date.now()}`);
+    let consecutivePollErrors = 0;
+
+    const cleanup = () => {
+      if (pollTimer) clearInterval(pollTimer);
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+      supabase.removeChannel(channel);
+      setIsRefreshing(false);
+    };
+
+    const finalize = () => {
+      const totalFiles = [...finalized.values()].reduce((acc, v) => acc + v.files, 0);
+      const failed = [...finalized.values()].filter(v => v.status === 'failed').length;
+      cleanup();
+      if (failed > 0 && failed === finalized.size) {
+        toast.error(`Error al actualizar datos en ${failed} estación(es)`);
+      } else if (failed > 0) {
+        toast.warning(`Datos actualizados (${totalFiles} archivos en ${finalized.size - failed}/${requests.length} estaciones; ${failed} con error)`);
+      } else {
+        toast.success(`Datos actualizados (${totalFiles} archivos en ${finalized.size} estación(es))`);
+      }
+      refreshData();
+    };
+
+    const recordStatus = (id: string, status: string, files: number) => {
+      if (!requestIds.has(id) || finalized.has(id)) return;
+      if (status === 'completed' || status === 'failed') {
+        finalized.set(id, { status, files });
+        if (finalized.size === requestIds.size) finalize();
+      }
+    };
+
     try {
-      const { generateUUID } = await import('./utils/generateUUID');
-      const requestId = generateUUID();
-      // Insert scan request
-      const { error } = await supabase.from('scan_requests').insert({
-        id: requestId,
-        station_id: stationId,
-        requested_by: currentUser?.email ?? null,
-      });
+      const { error } = await supabase.from('scan_requests').insert(requests);
       if (error) throw error;
 
-      toast.info('Solicitando actualizacion de datos...');
+      toast.info(
+        requests.length === 1
+          ? 'Solicitando actualización de datos...'
+          : `Solicitando actualización en ${requests.length} estaciones...`,
+      );
 
-      // Poll for completion (max 60 seconds)
-      const start = Date.now();
-      const poll = setInterval(async () => {
-        const { data } = await supabase
+      // Realtime: ruta principal (instantánea).
+      channel
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'scan_requests' },
+          (payload) => {
+            const row = payload.new as { id: string; status: string; files_processed: number | null };
+            recordStatus(row.id, row.status, row.files_processed ?? 0);
+          },
+        )
+        .subscribe();
+
+      // Fallback: poll cada 5s en caso de que realtime falle. Solo consulta
+      // las requests que aún no se resolvieron.
+      pollTimer = setInterval(async () => {
+        const pending = [...requestIds].filter(id => !finalized.has(id));
+        if (pending.length === 0) return;
+        const { data, error: pollErr } = await supabase
           .from('scan_requests')
-          .select('status,files_processed')
-          .eq('id', requestId)
-          .limit(1)
-          .maybeSingle();
-
-        if (data?.status === 'completed') {
-          clearInterval(poll);
-          toast.success(`Datos actualizados (${data.files_processed ?? 0} archivos)`);
-          setIsRefreshing(false);
-          refreshData();
-        } else if (data?.status === 'failed') {
-          clearInterval(poll);
-          toast.error('Error al actualizar datos');
-          setIsRefreshing(false);
-        } else if (Date.now() - start > 60000) {
-          clearInterval(poll);
-          toast.warning('Tiempo agotado. El agente puede no estar activo.');
-          setIsRefreshing(false);
+          .select('id,status,files_processed')
+          .in('id', pending);
+        if (pollErr) {
+          consecutivePollErrors += 1;
+          console.error('scan_requests poll error', pollErr);
+          if (consecutivePollErrors >= 3) {
+            cleanup();
+            toast.error('Error consultando estado del agente');
+          }
+          return;
         }
-      }, 3000);
+        consecutivePollErrors = 0;
+        for (const row of data ?? []) {
+          recordStatus(row.id, row.status, row.files_processed ?? 0);
+        }
+      }, 5000);
+
+      // Timeout total de 90s — si falta alguna, las marca como timeout y finaliza.
+      timeoutTimer = setTimeout(() => {
+        const missing = [...requestIds].filter(id => !finalized.has(id));
+        if (missing.length === 0) return;
+        for (const id of missing) finalized.set(id, { status: 'failed', files: 0 });
+        toast.warning(`Tiempo agotado en ${missing.length} estación(es). El agente puede no estar activo.`);
+        cleanup();
+        refreshData();
+      }, 90_000);
     } catch (err) {
-      handleError(err, 'Error al solicitar actualizacion');
-      setIsRefreshing(false);
+      cleanup();
+      handleError(err, 'Error al solicitar actualización');
     }
-  }, [isRefreshing, activeStationId, stations, currentUser, refreshData]);
+  }, [isRefreshing, stations, currentUser, refreshData]);
 
   // Sync selectedStation with fresh data
   useEffect(() => {
@@ -282,8 +339,6 @@ const Dashboard: React.FC = () => {
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
           onLogout={handleLogout}
-          unresolvedAlertCount={unresolvedAlertCount}
-          criticalAlertCount={criticalAlertCount}
           discrepancyCount={discrepancyCount}
           currentUser={currentUser}
           onRefresh={handleRefresh}
@@ -299,8 +354,6 @@ const Dashboard: React.FC = () => {
           isOpen={false}
           onClose={() => {}}
           onLogout={handleLogout}
-          unresolvedAlertCount={unresolvedAlertCount}
-          criticalAlertCount={criticalAlertCount}
           discrepancyCount={discrepancyCount}
           currentUser={currentUser}
           permanent={true}
@@ -321,8 +374,6 @@ const Dashboard: React.FC = () => {
               onRefresh={refreshData}
               isLoading={isLoading}
               onMapSearch={(lat: number, lng: number) => setMapFlyTo([lat, lng])}
-              unresolvedAlertCount={unresolvedAlertCount}
-              criticalAlertCount={criticalAlertCount}
             />
           )}
 
@@ -361,7 +412,6 @@ const Dashboard: React.FC = () => {
                 station={selectedStation}
                 employees={employees.filter(e => e.stationId === selectedStation.id)}
                 salesTransactions={salesTransactions.filter(t => t.stationId === selectedStation.id)}
-                alerts={alerts.filter(a => a.stationId === selectedStation.id && !a.resolved)}
                 onClose={() => setSelectedStation(null)}
                 onViewDetails={() => setCurrentView('STATIONS')}
               />
@@ -374,7 +424,6 @@ const Dashboard: React.FC = () => {
               <StationsView
                 stations={stations}
                 employees={employees}
-                alerts={alerts}
                 onSaveStation={saveStation}
                 onDeactivateStation={deactivateStation}
                 onDeleteStation={deleteStation}
@@ -402,20 +451,6 @@ const Dashboard: React.FC = () => {
             <Suspense fallback={<LoadingFallback />}>
               <TankLevelsView
                 stations={stations}
-                currentUser={currentUser}
-                activeStationId={activeStationId}
-                onStationChange={setActiveStationId}
-              />
-            </Suspense>
-          )}
-
-          {/* ALERTS */}
-          {currentView === 'ALERTS' && (
-            <Suspense fallback={<LoadingFallback />}>
-              <AlertsView
-                alerts={alerts}
-                stations={stations}
-                onResolveAlert={resolveAlert}
                 currentUser={currentUser}
                 activeStationId={activeStationId}
                 onStationChange={setActiveStationId}
@@ -502,8 +537,6 @@ const Dashboard: React.FC = () => {
         <BottomTabBar
           currentView={currentView}
           onViewChange={setCurrentView}
-          unresolvedAlertCount={unresolvedAlertCount}
-          criticalAlertCount={criticalAlertCount}
           className="lg:hidden shrink-0"
         />
       </div>
