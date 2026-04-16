@@ -1,13 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import { ShoppingBag, Search, ChevronDown, ChevronUp } from 'lucide-react';
-import { Station, DailyClosing } from '../types';
+import { Station, DailyClosing, RubroSale } from '../types';
 import StationFilter from './StationFilter';
 import TurnoFilter, { Turno, getTurnoFromClosingTs } from './TurnoFilter';
+import RubroSummary from './RubroSummary';
 import { getArgentinaToday } from '../utils/dateUtils';
 
 interface ShopViewProps {
     stations: Station[];
     dailyClosings: DailyClosing[];
+    rubroSales: RubroSale[];
     activeStationId?: string | null;
     onStationChange?: (id: string | null) => void;
 }
@@ -47,7 +49,7 @@ const SnapshotBreakdown: React.FC<{ snapshot: Record<string, number> }> = ({ sna
     );
 };
 
-const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, activeStationId, onStationChange }) => {
+const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, rubroSales, activeStationId, onStationChange }) => {
     const [search, setSearch] = useState('');
     const [dateFrom, setDateFrom] = useState(getArgentinaToday);
     const [dateTo, setDateTo] = useState(getArgentinaToday);
@@ -91,6 +93,12 @@ const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, activeStat
 
     const totalShop = dayRows.reduce((sum, d) => sum + d.total, 0);
 
+    const filteredRubros = useMemo(() => {
+        return rubroSales
+            .filter(r => r.shiftDate >= dateFrom && r.shiftDate <= dateTo)
+            .filter(r => !selectedStationId || r.stationId === selectedStationId);
+    }, [rubroSales, dateFrom, dateTo, selectedStationId]);
+
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
             <div className="shrink-0 p-5 pb-4 bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-white/10">
@@ -121,6 +129,8 @@ const ShopView: React.FC<ShopViewProps> = ({ stations, dailyClosings, activeStat
             </div>
 
             <div className="flex-1 overflow-y-auto p-5 space-y-3">
+                <RubroSummary rubros={filteredRubros} accentColor="violet" label="Ventas por Rubro" />
+
                 {dayRows.length === 0 ? (
                     <div className="py-24 text-center">
                         <ShoppingBag className="w-16 h-16 mx-auto text-gray-300 dark:text-slate-700 mb-4" />

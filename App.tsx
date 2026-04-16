@@ -21,6 +21,7 @@ import { useSalesTransactions } from './hooks/useSalesTransactions';
 import { useDailyClosings } from './hooks/useDailyClosings';
 import { useTankLevels } from './hooks/useTankLevels';
 import { useAnalytics } from './hooks/useAnalytics';
+import { useRubroSales } from './hooks/useRubroSales';
 
 import type { Session } from '@supabase/supabase-js';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -66,6 +67,7 @@ const Dashboard: React.FC = () => {
   const { dailyClosings, addNotes, discrepancyCount }   = useDailyClosings();
   const { tankLevels }                                  = useTankLevels();
   const { getStationMetrics, getDailyTimeSeries, getNetworkSummary, getPeriodSummary } = useAnalytics();
+  const { playaRubros, salonRubros } = useRubroSales();
 
   // ── Refresh button (triggers edge agent scan via Supabase) ──
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -464,6 +466,7 @@ const Dashboard: React.FC = () => {
               <PlayaView
                 stations={stations}
                 dailyClosings={dailyClosings}
+                rubroSales={playaRubros}
                 activeStationId={activeStationId}
                 onStationChange={setActiveStationId}
               />
@@ -476,6 +479,7 @@ const Dashboard: React.FC = () => {
               <ShopView
                 stations={stations}
                 dailyClosings={dailyClosings}
+                rubroSales={salonRubros}
                 activeStationId={activeStationId}
                 onStationChange={setActiveStationId}
               />

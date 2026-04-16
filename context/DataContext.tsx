@@ -9,10 +9,12 @@ import {
     AppNotification,
     AllowedEmail,
     CashClosing,
+    RubroSale,
 } from '../types';
 import {
     DbSalesTransactionRow,
     DbTankLevelRow,
+    DbRubroSaleRow,
     DbDailyClosingRow,
     DbCardPaymentRow,
     DbCashClosingRow,
@@ -32,6 +34,7 @@ import {
     dbToNotification,
     dbToAllowedEmail,
     dbToCashClosing,
+    dbToRubroSale,
 } from '../utils/mappers';
 import { handleError } from '../utils/errorHandler';
 import { TRANSACTIONS_LOAD_DAYS, RT_CHANNELS } from '../constants';
@@ -53,6 +56,8 @@ interface DataContextType {
     setDailyClosings: React.Dispatch<React.SetStateAction<DailyClosing[]>>;
     cashClosings: CashClosing[];
     setCashClosings: React.Dispatch<React.SetStateAction<CashClosing[]>>;
+    rubroSales: RubroSale[];
+    setRubroSales: React.Dispatch<React.SetStateAction<RubroSale[]>>;
     allowedEmails: AllowedEmail[];
     setAllowedEmails: React.Dispatch<React.SetStateAction<AllowedEmail[]>>;
     notifications: AppNotification[];
@@ -73,6 +78,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [tankLevels, setTankLevels]               = useState<TankLevel[]>([]);
     const [dailyClosings, setDailyClosings]         = useState<DailyClosing[]>([]);
     const [cashClosings, setCashClosings]             = useState<CashClosing[]>([]);
+    const [rubroSales, setRubroSales]               = useState<RubroSale[]>([]);
     const [notifications, setNotifications]         = useState<AppNotification[]>([]);
     const [allowedEmails, setAllowedEmails]         = useState<AllowedEmail[]>([]);
     const [isLoading, setIsLoading]                 = useState(true);
@@ -154,6 +160,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 if (ccResult.data) setCashClosings(ccResult.data.map(dbToCashClosing));
             } catch {
                 console.warn('[DataContext] cash_closings table not available');
+            }
+
+            try {
+                const rsResult = await supabase.from('rubro_sales').select('*')
+                    .gte('shift_date', dateCutoffDate)
+                    .order('shift_date', { ascending: false });
+                if (rsResult.data) setRubroSales(rsResult.data.map(dbToRubroSale));
+            } catch {
+                console.warn('[DataContext] rubro_sales table not available');
             }
 
             try {
@@ -306,12 +321,33 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 }
             ).subscribe();
 
+        const rubroSalesChannel = supabase
+            .channel(RT_CHANNELS.RUBRO_SALES)
+            .on('postgres_changes',
+                { event: '*', schema: 'public', table: 'rubro_sales' },
+                (payload) => {
+                    if (payload.eventType === 'INSERT') {
+                        setRubroSales(prev => {
+                            if (prev.some(r => r.id === payload.new.id)) return prev;
+                            return [dbToRubroSale(payload.new as DbRubroSaleRow), ...prev];
+                        });
+                    } else if (payload.eventType === 'UPDATE') {
+                        setRubroSales(prev => prev.map(r =>
+                            r.id === payload.new.id ? dbToRubroSale(payload.new as DbRubroSaleRow) : r
+                        ));
+                    } else if (payload.eventType === 'DELETE') {
+                        setRubroSales(prev => prev.filter(r => r.id !== payload.old.id));
+                    }
+                }
+            ).subscribe();
+
         return () => {
             supabase.removeChannel(salesChannel);
             supabase.removeChannel(tanksChannel);
             supabase.removeChannel(closingsChannel);
             supabase.removeChannel(cardPaymentsChannel);
             supabase.removeChannel(cashClosingsChannel);
+            supabase.removeChannel(rubroSalesChannel);
             supabase.removeChannel(stationsChannel);
             supabase.removeChannel(notificationsChannel);
         };
@@ -326,6 +362,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             tankLevels,           setTankLevels,
             dailyClosings,        setDailyClosings,
             cashClosings,         setCashClosings,
+            rubroSales,           setRubroSales,
             allowedEmails,        setAllowedEmails,
             notifications,
             unreadCount,

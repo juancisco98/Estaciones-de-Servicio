@@ -8,7 +8,7 @@ You are the **Central Operational Brain** for a network of 60 gas stations. Your
 ## 2. Reasoning Layers (The Cascade Method)
 
 ### Layer 1: Perception (Raw Ingestion)
-- **Data Sources:** Monitor and ingest `VE` (Detailed Sales), `C` (Current Accounts/Cards), `P` (Forecourt Totals), `S` (Shop Totals), and `T` (Tank/Inventory) files.
+- **Data Sources:** Monitor and ingest `VE` (Detailed Sales), `C` (Current Accounts/Cards), `P` (Forecourt Totals), `S` (Shop Totals), `T` (Tank/Inventory), `RP` (Rubro Playa) and `RS` (Rubro Salon) files.
 - **Context Identification:** Extract Station ID and Shift Number (e.g., Turno 88, Playa 1) from every file.
 - **Validation:** Ensure file integrity before processing to prevent partial data ingestion.
 
@@ -120,6 +120,7 @@ React (App.tsx)                 ← polls hasta completed → toast + refreshDat
 | `edge_agent/parsers/t_parser.py` | Parser T*.TXT — tanques dinámicos TQ1-TQ99, año 2/4 dígitos |
 | `edge_agent/parsers/c_parser.py` | Parser C*.TXT — cuentas corrientes y tarjetas, detecta líneas corruptas VB |
 | `edge_agent/parsers/a_parser.py` | Parser A*.TXT — caja (efectivo + cheques) por turno |
+| `edge_agent/parsers/rubro_parser.py` | Parser RP*.TXT y RS*.TXT — ventas por rubro (playa y salon). Un solo parser para ambos prefijos |
 | `edge_agent/scheduled_scan.py` | One-shot scan invocado por la tarea programada (06:15, 14:15, 22:15) |
 | `edge_agent/config.yaml` | supabase_url, watch_path, station_id, max_file_size |
 | `edge_agent/setup.ps1` | Instalador automático: para servicio → copia → limpia cache → configura → arranca |
@@ -132,6 +133,7 @@ React (App.tsx)                 ← polls hasta completed → toast + refreshDat
 | `components/TurnoFilter.tsx` | Filtro Mañana(6-14)/Tarde(14-22)/Noche(22-6) + `getTurnoFromTs()` |
 | `components/PlayaView.tsx` | Datos P files EXCLUSIVAMENTE (SnapshotBreakdown), filtro turno |
 | `components/ShopView.tsx` | Datos S files EXCLUSIVAMENTE (SnapshotBreakdown), filtro turno |
+| `components/RubroSummary.tsx` | Panel colapsable de ventas agrupadas por rubro — usado en PlayaView y ShopView |
 | `components/CajaView.tsx` | Datos A files — efectivo + cheques por turno |
 | `components/Header.tsx` | Indicador de salud por estación (ONLINE/LENTO/OFFLINE) |
 | `constants.ts` | MAP_CENTER, PRODUCT_CODES, ALERT_LEVELS, PAYMENT_METHODS |
@@ -151,6 +153,7 @@ React (App.tsx)                 ← polls hasta completed → toast + refreshDat
 | `tank_levels` | Niveles TQ1-TQ99 de T*.TXT (dinámico, CHECK regex) |
 | `daily_closings` | Totales P+S por turno. Columnas separadas P/S: `p_closing_ts`, `s_closing_ts`, `p_totals_snapshot`, `s_totals_snapshot`. UNIQUE: `(station_id, shift_date, turno)` |
 | `cash_closings` | Totales A (efectivo + cheques) por turno. UNIQUE: `(station_id, shift_date, turno)` |
+| `rubro_sales` | Ventas por rubro de RP*.TXT y RS*.TXT. `source_type` distingue playa (RP) de salon (RS). UNIQUE: `(station_id, shift_date, turno, source_type, rubro_id, rubro_name)` |
 | `scan_requests` | Pedidos de refresh desde dashboard. Edge agent polls cada 15s |
 | `station_knowledge` | JSONB de aprendizaje por estación |
 | `notifications` | Notificaciones UI (sin cambios) |
@@ -266,10 +269,17 @@ className="... overflow-y-auto"               // body
 6. Registra e inicia servicio Windows
 7. Configura tarea programada de respaldo (06:15, 14:15, 22:15)
 
-### PlayaView/ShopView — Solo datos P/S
-- Playa muestra EXCLUSIVAMENTE el desglose del archivo P (`SnapshotBreakdown`): VENTAS DE COMBUSTIBLES, TIRADAS EFECTIVO, etc.
-- Mini Mercado muestra EXCLUSIVAMENTE el desglose del archivo S.
+### PlayaView/ShopView — Datos P/S + Rubros RP/RS
+- Playa muestra el desglose del archivo P (`SnapshotBreakdown`) + panel `RubroSummary` con datos de RP (ventas por rubro playa).
+- Mini Mercado muestra el desglose del archivo S + panel `RubroSummary` con datos de RS (ventas por rubro salon).
 - **NO muestran transacciones VE individuales.** Los productos VE solo se ven en Historial de Ventas.
+- `RubroSummary` agrupa por `rubro_id`, suma cantidades y montos. Un mismo rubro puede tener múltiples productos (ej: Rubro 1 = AXION SUPER + AXION DIESEL X10).
+
+### RP/RS parser — Un solo parser para ambos
+- Ambos archivos usan formato `RUBRO N <nombre> <qty> <amount>`. `RubroParser` infiere `source_type` del prefijo del filename (RP→playa, RS→salon).
+- El turno se extrae del filename (misma lógica que `a_parser.py`): digits después de DDMM.
+- Los archivos RP/RS NO contienen la keyword `TURNO` en el contenido (a diferencia de P/S).
+- Cada línea es un record independiente en `rubro_sales` (multi-row, como VE/C/T).
 
 ### Indicador de salud de estación — Header
 - Usa `stations.last_heartbeat` (actualizado cada 60s por el edge agent) como única fuente de verdad.
@@ -412,6 +422,12 @@ Cada vez que se detecte un error de parsing o reconciliación que se repita 3+ v
 
 #### Logging — Cambiar prefijo desconocido a WARNING
 - Si aparece un archivo con prefijo no mapeado en `FILE_PREFIX_MAP` (ej. tipo de archivo VB nuevo), `process_file()` ahora lo loguea como WARNING en vez de DEBUG. Antes el archivo se descartaba en silencio sin que el dueño/dev se enterara.
+
+#### RP/RS — Parser unificado y rubro_id no es único por archivo (2026-04-16)
+- Ambos archivos RP y RS usan el mismo formato `RUBRO N <nombre> <qty> <amount>`. Un solo `RubroParser` sirve para ambos — `source_type` se infiere del prefijo del filename.
+- **Rubro duplicado:** un mismo `rubro_id` puede contener múltiples productos (ej: Rubro 1 = AXION SUPER + AXION DIESEL X10). El UNIQUE constraint de `rubro_sales` incluye `rubro_name` además de `rubro_id` para distinguirlos.
+- **Turno no está en el contenido:** a diferencia de P/S, los archivos RP/RS no tienen la keyword `TURNO`. Se extrae del filename (digits[4:] después de DDMM), mismo patrón que `a_parser.py`.
+- El frontend `RubroSummary` agrupa por `rubro_id` para mostrar totales por categoría al dueño.
 
 ---
 

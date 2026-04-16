@@ -146,6 +146,25 @@ export interface DailyClosing {
   updatedAt?: string;
 }
 
+// ── RUBRO SALES (from RP*.TXT + RS*.TXT) ──
+
+export type RubroSourceType = 'RP' | 'RS';
+
+export interface RubroSale {
+  id: string;
+  stationId: string;
+  shiftDate: string;
+  turno: number;
+  sourceType: RubroSourceType;
+  rubroId: string;
+  rubroName: string;
+  quantity: number;
+  amount: number;
+  fileName: string;
+  rawLine?: string;
+  ingestedAt?: string;
+}
+
 // ── CASH CLOSINGS (A files) ──
 
 export interface CashClosing {

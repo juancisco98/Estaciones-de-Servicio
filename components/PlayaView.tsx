@@ -1,13 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import { Fuel, Search, ChevronDown, ChevronUp } from 'lucide-react';
-import { Station, DailyClosing } from '../types';
+import { Station, DailyClosing, RubroSale } from '../types';
 import StationFilter from './StationFilter';
 import TurnoFilter, { Turno, getTurnoFromClosingTs } from './TurnoFilter';
+import RubroSummary from './RubroSummary';
 import { getArgentinaToday } from '../utils/dateUtils';
 
 interface PlayaViewProps {
     stations: Station[];
     dailyClosings: DailyClosing[];
+    rubroSales: RubroSale[];
     activeStationId?: string | null;
     onStationChange?: (id: string | null) => void;
 }
@@ -47,7 +49,7 @@ const SnapshotBreakdown: React.FC<{ snapshot: Record<string, number> }> = ({ sna
     );
 };
 
-const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, activeStationId, onStationChange }) => {
+const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, rubroSales, activeStationId, onStationChange }) => {
     const [search, setSearch] = useState('');
     const [dateFrom, setDateFrom] = useState(getArgentinaToday);
     const [dateTo, setDateTo] = useState(getArgentinaToday);
@@ -91,6 +93,12 @@ const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, activeSt
 
     const totalPlaya = dayRows.reduce((sum, d) => sum + d.total, 0);
 
+    const filteredRubros = useMemo(() => {
+        return rubroSales
+            .filter(r => r.shiftDate >= dateFrom && r.shiftDate <= dateTo)
+            .filter(r => !selectedStationId || r.stationId === selectedStationId);
+    }, [rubroSales, dateFrom, dateTo, selectedStationId]);
+
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
             <div className="shrink-0 p-5 pb-4 bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-white/10">
@@ -121,6 +129,8 @@ const PlayaView: React.FC<PlayaViewProps> = ({ stations, dailyClosings, activeSt
             </div>
 
             <div className="flex-1 overflow-y-auto p-5 space-y-3">
+                <RubroSummary rubros={filteredRubros} accentColor="amber" label="Ventas por Rubro" />
+
                 {dayRows.length === 0 ? (
                     <div className="py-24 text-center">
                         <Fuel className="w-16 h-16 mx-auto text-gray-300 dark:text-slate-700 mb-4" />

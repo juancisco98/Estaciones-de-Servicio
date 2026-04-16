@@ -8,6 +8,8 @@ import {
   TankLevel,
   TankId,
   DailyClosing,
+  RubroSale,
+  RubroSourceType,
   ClosingStatus,
   AppNotification,
   NotificationType,
@@ -35,6 +37,7 @@ import {
   DbAllowedEmailRow,
   DbOwnerPreferencesRow,
   DbCashClosingRow,
+  DbRubroSaleRow,
 } from '../types/dbRows';
 
 export const dbToStation = (row: DbStationRow): Station => ({
@@ -256,6 +259,21 @@ export const dbToCashClosing = (row: DbCashClosingRow): CashClosing => ({
   closingTs:    row.closing_ts ?? undefined,
   aFileName:    row.a_file_name ?? undefined,
   createdAt:    row.created_at,
+});
+
+export const dbToRubroSale = (row: DbRubroSaleRow): RubroSale => ({
+  id:         row.id,
+  stationId:  row.station_id,
+  shiftDate:  row.shift_date,
+  turno:      Number(row.turno),
+  sourceType: row.source_type as RubroSourceType,
+  rubroId:    row.rubro_id,
+  rubroName:  row.rubro_name,
+  quantity:   Number(row.quantity),
+  amount:     Number(row.amount),
+  fileName:   row.file_name,
+  rawLine:    row.raw_line ?? undefined,
+  ingestedAt: row.ingested_at,
 });
 
 export const dbToNotification = (row: DbNotificationRow): AppNotification => ({

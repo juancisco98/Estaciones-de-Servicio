@@ -31,6 +31,8 @@ _TABLE_ROUTING: dict[str, tuple[str, str]] = {
     "P":  ("daily_closings",     "station_id,shift_date,turno"),
     "S":  ("daily_closings",     "station_id,shift_date,turno"),
     "A":  ("cash_closings",      "station_id,shift_date,turno"),
+    "RP": ("rubro_sales",        "station_id,shift_date,turno,source_type,rubro_id,rubro_name"),
+    "RS": ("rubro_sales",        "station_id,shift_date,turno,source_type,rubro_id,rubro_name"),
 }
 
 
@@ -57,6 +59,12 @@ class SupabaseUploader:
 
     def upload_parse_result(self, result: ParseResult) -> bool:
         if not result.records:
+            if result.errors:
+                logger.warning(
+                    "0 records from %s with %d errors — marking as FAILED so it retries",
+                    result.file_name, len(result.errors),
+                )
+                return False
             logger.info(
                 "No records to upload from %s (lines_parsed=%d, errors=%d)",
                 result.file_name, result.lines_parsed, len(result.errors),

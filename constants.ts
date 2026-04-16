@@ -98,4 +98,5 @@ export const RT_CHANNELS = {
   CASH_CLOSINGS: 'cash_closings_realtime',
   STATIONS:      'stations_realtime',
   NOTIFICATIONS: 'notifications_realtime',
+  RUBRO_SALES:   'rubro_sales_realtime',
 } as const;

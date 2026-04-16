@@ -113,6 +113,21 @@ export interface DbDailyClosingRow {
   updated_at?: string;
 }
 
+export interface DbRubroSaleRow {
+  id: string;
+  station_id: string;
+  shift_date: string;
+  turno: number;
+  source_type: string;
+  rubro_id: string;
+  rubro_name: string;
+  quantity: number | string;
+  amount: number | string;
+  file_name: string;
+  raw_line?: string | null;
+  ingested_at?: string;
+}
+
 export interface DbCashClosingRow {
   id: string;
   station_id: string;

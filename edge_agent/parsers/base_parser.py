@@ -51,7 +51,7 @@ class BaseParser(ABC):
 
     def _infer_file_type(self) -> str:
         name = self.file_name.upper()
-        for prefix in ("VE", "C", "T", "P", "S", "A"):
+        for prefix in ("VE", "RP", "RS", "C", "TQ", "T", "P", "S", "A"):
             if name.startswith(prefix):
                 return prefix
         return "UNKNOWN"

@@ -80,14 +80,13 @@ class StateManager:
         return False
 
     def is_processed(self, file_path: str, md5: str) -> bool:
-        # FIX 1: Archivos de HOY siempre se reprocesан
         if self._is_today(file_path):
             with self._lock:
                 entry = self._state.get(file_path)
                 if entry is None:
                     return False
-                # Solo skipear si el MD5 es exactamente el mismo
-                # (el archivo no cambió desde el último procesamiento)
+                if "fail_count" in entry:
+                    return False
                 return entry.get("md5") == md5
         with self._lock:
             entry = self._state.get(file_path)
